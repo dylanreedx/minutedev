@@ -3,8 +3,7 @@
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { auth } from '@/lib/auth';
-import { db, projects } from '@minute/db';
-import { eq, desc } from 'drizzle-orm';
+import { db, projects, eq, desc } from '@minute/db';
 import { z } from 'zod';
 
 // Utility function to generate slug from name
@@ -32,7 +31,7 @@ async function ensureUniqueSlug(
       .where(eq(projects.slug, slug))
       .limit(1);
 
-    if (existing.length === 0 || (excludeId && existing[0].id === excludeId)) {
+    if (existing.length === 0 || (excludeId && existing[0]?.id === excludeId)) {
       return slug;
     }
 
@@ -103,7 +102,7 @@ export async function createProject(
       return {
         success: false,
         error: 'Validation error',
-        details: error.errors,
+        details: error.issues,
       };
     }
     return {
@@ -206,9 +205,9 @@ export async function updateProject(
       name?: string;
       description?: string | null;
       slug?: string;
-      updatedAt?: number;
+      updatedAt?: Date;
     } = {
-      updatedAt: Math.floor(Date.now() / 1000), // Unix timestamp in seconds
+      updatedAt: new Date(),
     };
 
     if (validated.name !== undefined) {
@@ -231,6 +230,13 @@ export async function updateProject(
       .where(eq(projects.id, validated.id))
       .returning();
 
+    if (!updated) {
+      return {
+        success: false,
+        error: 'Failed to update project',
+      };
+    }
+
     // Revalidate relevant paths
     revalidatePath('/projects');
     revalidatePath(`/projects/${updated.slug}`);
@@ -242,7 +248,7 @@ export async function updateProject(
       return {
         success: false,
         error: 'Validation error',
-        details: error.errors,
+        details: error.issues,
       };
     }
     return {

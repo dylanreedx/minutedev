@@ -36,3 +36,6 @@ export const db = new Proxy({} as ReturnType<typeof drizzle<typeof schema>>, {
 export * from "./schema";
 export type { schema };
 
+// Re-export drizzle-orm operators to avoid version mismatch issues
+export { eq, and, or, not, gt, gte, lt, lte, ne, isNull, isNotNull, inArray, notInArray, exists, notExists, between, notBetween, like, notLike, ilike, notIlike, sql, asc, desc, max, min, sum, count, avg } from "drizzle-orm";
+

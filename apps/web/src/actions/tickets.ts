@@ -7,10 +7,14 @@ import {
   db,
   tickets,
   projects,
+  eq,
+  and,
+  desc,
+  sql,
+  max,
   type TicketStatus,
   type TicketPriority,
 } from '@minute/db';
-import { eq, and, desc, sql, max } from 'drizzle-orm';
 import { z } from 'zod';
 
 // Gap-based ordering constant
@@ -108,11 +112,13 @@ async function rebalanceColumn(projectId: string, status: TicketStatus) {
 
   // Update each ticket with new order values
   for (let i = 0; i < columnTickets.length; i++) {
+    const ticket = columnTickets[i];
+    if (!ticket) continue;
     const newOrder = (i + 1) * ORDER_GAP;
     await db
       .update(tickets)
       .set({ order: newOrder })
-      .where(eq(tickets.id, columnTickets[i].id));
+      .where(eq(tickets.id, ticket.id));
   }
 }
 
@@ -173,7 +179,7 @@ export async function createTicket(input: z.infer<typeof createTicketSchema>) {
       return {
         success: false,
         error: 'Validation error',
-        details: error.errors,
+        details: error.issues,
       };
     }
     return {
@@ -348,7 +354,7 @@ export async function updateTicket(input: z.infer<typeof updateTicketSchema>) {
       return {
         success: false,
         error: 'Validation error',
-        details: error.errors,
+        details: error.issues,
       };
     }
     return {
@@ -448,7 +454,7 @@ export async function reorderTicket(
         .orderBy(tickets.order)
         .limit(1);
 
-      if (belowTickets.length > 0) {
+      if (belowTickets.length > 0 && belowTickets[0]) {
         const belowOrder = belowTickets[0].order;
         const gap = belowOrder - aboveOrder;
 
@@ -470,11 +476,10 @@ export async function reorderTicket(
           const targetIndex = rebalancedTickets.findIndex(
             (t) => t.order === aboveOrder
           );
-          if (targetIndex >= 0 && targetIndex < rebalancedTickets.length - 1) {
-            newOrder =
-              (rebalancedTickets[targetIndex].order +
-                rebalancedTickets[targetIndex + 1].order) /
-              2;
+          const targetTicket = rebalancedTickets[targetIndex];
+          const nextTicket = rebalancedTickets[targetIndex + 1];
+          if (targetIndex >= 0 && targetTicket && nextTicket) {
+            newOrder = (targetTicket.order + nextTicket.order) / 2;
           } else {
             newOrder = (targetIndex + 1) * ORDER_GAP;
           }
@@ -516,7 +521,7 @@ export async function reorderTicket(
       return {
         success: false,
         error: 'Validation error',
-        details: error.errors,
+        details: error.issues,
       };
     }
     return {
