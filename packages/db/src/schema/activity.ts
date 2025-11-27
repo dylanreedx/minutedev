@@ -64,3 +64,4 @@ export type NewTicketHistory = typeof ticketHistory.$inferInsert;
 export type ActivityLog = typeof activityLog.$inferSelect;
 export type NewActivityLog = typeof activityLog.$inferInsert;
 
+

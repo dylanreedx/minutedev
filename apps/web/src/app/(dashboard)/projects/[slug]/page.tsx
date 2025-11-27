@@ -9,3 +9,4 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
   redirect(`/projects/${slug}/board`);
 }
 
+
