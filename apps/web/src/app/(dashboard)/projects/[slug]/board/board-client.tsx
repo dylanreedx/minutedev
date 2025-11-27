@@ -7,13 +7,16 @@ import { List, GripVertical } from "lucide-react";
 import {
   DndContext,
   DragOverlay,
-  closestCorners,
+  pointerWithin,
+  rectIntersection,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
   type DragStartEvent,
   type DragEndEvent,
+  type DragOverEvent,
+  type CollisionDetection,
   useDroppable,
 } from "@dnd-kit/core";
 import {
@@ -83,6 +86,17 @@ function SortableTicketCard({
     transition,
   };
 
+  // Hide the original card when dragging (DragOverlay shows the visual)
+  // Keep the ref attached but make it invisible
+  if (isDragging && !isDragOverlay) {
+    return (
+      <div
+        ref={setNodeRef}
+        style={{ ...style, opacity: 0, height: 0, margin: 0, padding: 0, overflow: 'hidden' }}
+      />
+    );
+  }
+
   return (
     <div
       ref={setNodeRef}
@@ -90,9 +104,7 @@ function SortableTicketCard({
       className={`rounded-md border bg-background p-3 transition-shadow ${
         isDragOverlay 
           ? "shadow-lg ring-2 ring-primary/20 cursor-grabbing border-border" 
-          : isDragging
-            ? "opacity-30 border-border"
-            : "border-border hover:shadow-sm cursor-pointer"
+          : "border-border hover:shadow-sm cursor-pointer"
       }`}
       onClick={isDragOverlay ? undefined : onEdit}
     >
@@ -118,15 +130,55 @@ function SortableTicketCard({
   );
 }
 
+// Placeholder component for drop indicator with animation
+function DropPlaceholder() {
+  return (
+    <div 
+      className="rounded-md border-2 border-dashed border-primary/50 bg-primary/5 h-14 my-1 
+                 animate-in fade-in slide-in-from-top-2 duration-150"
+    />
+  );
+}
+
+// Custom collision detection - more forgiving than closestCorners
+// Uses rectIntersection for wide detection area, then prioritizes tickets
+const customCollisionDetection: CollisionDetection = (args) => {
+  // Use rect intersection first - it's more forgiving with larger hit areas
+  const rectCollisions = rectIntersection(args);
+  
+  if (rectCollisions.length > 0) {
+    // Prioritize tickets over columns for precise positioning
+    const ticketCollisions = rectCollisions.filter(
+      (c) => c.data?.droppableContainer?.data?.current?.type === "ticket"
+    );
+    
+    if (ticketCollisions.length > 0) {
+      // Return the ticket collision (if multiple, return first - closest)
+      return [ticketCollisions[0]];
+    }
+    
+    // No tickets found, return column collisions
+    return rectCollisions;
+  }
+  
+  // Fall back to pointer within for edge cases
+  const pointerCollisions = pointerWithin(args);
+  return pointerCollisions;
+};
+
 // Droppable column component (for empty columns)
 function DroppableColumn({
   id,
   children,
   className,
+  overId,
+  ticketsGrouped,
 }: {
   id: string;
   children: React.ReactNode;
   className?: string;
+  overId: string | null;
+  ticketsGrouped?: Record<TicketStatus, Ticket[]>;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id,
@@ -136,10 +188,23 @@ function DroppableColumn({
     },
   });
 
+  // Check if this column is being dragged over
+  // Either directly (isOver or overId === id) or via a ticket in this column
+  let isColumnOver = isOver || (overId === id);
+  
+  // Also check if overId is a ticket in this column
+  if (!isColumnOver && overId && ticketsGrouped) {
+    const columnTickets = ticketsGrouped[id as TicketStatus] || [];
+    if (columnTickets.some((t) => t.id === overId)) {
+      // overId is a ticket in this column, so this column is being dragged over
+      isColumnOver = true;
+    }
+  }
+
   return (
     <div
       ref={setNodeRef}
-      className={`${className} ${isOver ? "ring-2 ring-primary/30" : ""}`}
+      className={`${className} ${isColumnOver ? "ring-2 ring-primary/30" : ""}`}
     >
       {children}
     </div>
@@ -162,6 +227,8 @@ export function BoardPageClient({
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+  const [overPosition, setOverPosition] = useState<"above" | "below" | null>(null);
 
   // Get the active ticket for drag overlay
   const activeTicket = useMemo(() => {
@@ -193,10 +260,74 @@ export function BoardPageClient({
     setActiveId(event.active.id as string);
   }, []);
 
+  // Handle drag over - track which column/ticket is being dragged over and position
+  const handleDragOver = useCallback((event: DragOverEvent) => {
+    const { over, active, collisions } = event;
+    
+    if (!over || !active) {
+      setOverId(null);
+      setOverPosition(null);
+      return;
+    }
+
+    const overIdStr = over.id as string;
+    setOverId(overIdStr);
+
+    // Determine if we're dragging above or below a ticket
+    // Check if over is a ticket (not a column)
+    if (over.data.current?.type === "ticket" && ticketsGrouped) {
+      // Find which column this ticket is in
+      let targetColumn: TicketStatus | null = null;
+      let targetTickets: Ticket[] = [];
+      
+      for (const status of Object.keys(ticketsGrouped) as TicketStatus[]) {
+        const tickets = ticketsGrouped[status] || [];
+        const ticket = tickets.find((t) => t.id === overIdStr);
+        if (ticket) {
+          targetColumn = status;
+          targetTickets = tickets;
+          break;
+        }
+      }
+
+      if (targetColumn && targetTickets.length > 0) {
+        const overIndex = targetTickets.findIndex((t) => t.id === overIdStr);
+        const activeIndex = targetTickets.findIndex((t) => t.id === active.id);
+        
+        // For same column - use index comparison
+        if (activeIndex !== -1) {
+          setOverPosition(activeIndex < overIndex ? "below" : "above");
+          return;
+        }
+        
+        // For cross-column drags - use the dragged element's center vs target's center
+        const overRect = over.rect;
+        const activeTranslated = active.rect.current?.translated;
+        
+        if (overRect && activeTranslated) {
+          const overMiddleY = overRect.top + overRect.height / 2;
+          const activeMiddleY = activeTranslated.top + activeTranslated.height / 2;
+          setOverPosition(activeMiddleY < overMiddleY ? "above" : "below");
+        } else {
+          // Fallback: use collision data or default to above
+          // This ensures first ticket can receive "above" position
+          setOverPosition("above");
+        }
+      } else {
+        setOverPosition(null);
+      }
+    } else {
+      // Dragging over column (empty area)
+      setOverPosition(null);
+    }
+  }, [ticketsGrouped]);
+
   // Handle drag end
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
       const { active, over } = event;
+      setOverId(null);
+      setOverPosition(null);
 
       if (!over || !ticketsGrouped) {
         setActiveId(null);
@@ -372,6 +503,8 @@ export function BoardPageClient({
   // Handle drag cancel
   const handleDragCancel = useCallback(() => {
     setActiveId(null);
+    setOverId(null);
+    setOverPosition(null);
   }, []);
 
   return (
@@ -410,8 +543,9 @@ export function BoardPageClient({
         ) : (
           <DndContext
             sensors={sensors}
-            collisionDetection={closestCorners}
+            collisionDetection={customCollisionDetection}
             onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
             onDragCancel={handleDragCancel}
           >
@@ -425,6 +559,8 @@ export function BoardPageClient({
                     key={column.id}
                     id={column.id}
                     className={`min-w-[300px] flex-shrink-0 rounded-lg ${column.color} p-4 transition-all`}
+                    overId={overId}
+                    ticketsGrouped={ticketsGrouped}
                   >
                     <div className="mb-4 flex items-center justify-between">
                       <h3 className="font-medium">{column.name}</h3>
@@ -436,24 +572,44 @@ export function BoardPageClient({
                       items={ticketIds}
                       strategy={verticalListSortingStrategy}
                     >
-                      <div className="space-y-2 min-h-[100px]">
+                      <div className="flex flex-col gap-2 min-h-[100px]">
                         {tickets.length === 0 ? (
-                          <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-border bg-background/50 p-8 text-center">
-                            <p className="text-sm text-muted-foreground">
-                              No tickets
-                            </p>
-                          </div>
+                          activeId && overId === column.id ? (
+                            // Show full-width placeholder when dragging over empty column
+                            <div className="rounded-md border-2 border-dashed border-primary/50 bg-primary/5 h-20 
+                                          animate-in fade-in duration-150 flex items-center justify-center">
+                              <span className="text-xs text-primary/50">Drop here</span>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center rounded-md border border-dashed border-border bg-background/50 p-8 text-center">
+                              <p className="text-sm text-muted-foreground">
+                                No tickets
+                              </p>
+                            </div>
+                          )
                         ) : (
-                          tickets.map((ticket) => (
-                            <SortableTicketCard
-                              key={ticket.id}
-                              ticket={ticket}
-                              onEdit={() => {
-                                setSelectedTicketId(ticket.id);
-                                setIsEditDialogOpen(true);
-                              }}
-                            />
-                          ))
+                          tickets.map((ticket, index) => {
+                            // Simplified check: are we dragging and hovering over this ticket?
+                            const isDragging = activeId && activeId !== ticket.id;
+                            const isHoveringThis = overId === ticket.id;
+                            
+                            const showPlaceholderAbove = isDragging && isHoveringThis && overPosition === "above";
+                            const showPlaceholderBelow = isDragging && isHoveringThis && overPosition === "below";
+
+                            return (
+                              <div key={ticket.id} className="transition-all duration-150">
+                                {showPlaceholderAbove && <DropPlaceholder />}
+                                <SortableTicketCard
+                                  ticket={ticket}
+                                  onEdit={() => {
+                                    setSelectedTicketId(ticket.id);
+                                    setIsEditDialogOpen(true);
+                                  }}
+                                />
+                                {showPlaceholderBelow && <DropPlaceholder />}
+                              </div>
+                            );
+                          })
                         )}
                       </div>
                     </SortableContext>
@@ -462,8 +618,13 @@ export function BoardPageClient({
               })}
             </div>
 
-            {/* Drag overlay - no drop animation for instant feel */}
-            <DragOverlay dropAnimation={null}>
+            {/* Drag overlay with smooth animation */}
+            <DragOverlay
+              dropAnimation={{
+                duration: 200,
+                easing: "cubic-bezier(0.18, 1, 0.22, 1)",
+              }}
+            >
               {activeTicket ? (
                 <SortableTicketCard
                   ticket={activeTicket}
