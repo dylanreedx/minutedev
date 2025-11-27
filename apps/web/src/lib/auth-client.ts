@@ -12,4 +12,4 @@ export const authClient = createAuthClient({
 export const { signIn, signUp, signOut, useSession } = authClient;
 
 // Export email OTP methods explicitly
-export const { sendVerificationOtp, verifyEmail, checkVerificationOtp } = authClient;
+export const { sendVerificationOtp, verifyEmail, checkVerificationOtp } = authClient.emailOtp;

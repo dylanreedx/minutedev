@@ -31,7 +31,8 @@ export function useTickets(projectId: string) {
     queryFn: async () => {
       const result = await getTickets(projectId);
       if (!result.success) {
-        throw new Error(result.error || "Failed to fetch tickets");
+        const errorMessage = 'error' in result ? result.error : "Failed to fetch tickets";
+        throw new Error(errorMessage);
       }
       return result.data;
     },
@@ -45,9 +46,13 @@ export function useTicket(ticketId: string, options?: { enabled?: boolean }) {
     queryFn: async () => {
       const result = await getTicket(ticketId);
       if (!result.success) {
-        throw new Error(result.error || "Failed to fetch ticket");
+        const errorMessage = 'error' in result ? result.error : "Failed to fetch ticket";
+        throw new Error(errorMessage);
       }
-      return result.data;
+      if ('data' in result) {
+        return result.data;
+      }
+      throw new Error("Failed to fetch ticket");
     },
     enabled: options?.enabled !== undefined ? options.enabled : !!ticketId,
   });
@@ -61,9 +66,13 @@ export function useCreateTicket() {
     mutationFn: async (input: CreateTicketInput) => {
       const result = await createTicket(input);
       if (!result.success) {
-        throw new Error(result.error || "Failed to create ticket");
+        const errorMessage = 'error' in result ? result.error : "Failed to create ticket";
+        throw new Error(errorMessage);
       }
-      return result.data;
+      if ('data' in result) {
+        return result.data;
+      }
+      throw new Error("Failed to create ticket");
     },
     onSuccess: (data, variables) => {
       // Invalidate tickets list for the project
@@ -83,9 +92,13 @@ export function useUpdateTicket() {
     mutationFn: async (input: UpdateTicketInput) => {
       const result = await updateTicket(input);
       if (!result.success) {
-        throw new Error(result.error || "Failed to update ticket");
+        const errorMessage = 'error' in result ? result.error : "Failed to update ticket";
+        throw new Error(errorMessage);
       }
-      return result.data;
+      if ('data' in result) {
+        return result.data;
+      }
+      throw new Error("Failed to update ticket");
     },
     onSuccess: (data, variables) => {
       // Invalidate ticket detail
@@ -111,7 +124,8 @@ export function useDeleteTicket() {
     mutationFn: async (ticketId: string) => {
       const result = await deleteTicket(ticketId);
       if (!result.success) {
-        throw new Error(result.error || "Failed to delete ticket");
+        const errorMessage = 'error' in result ? result.error : "Failed to delete ticket";
+        throw new Error(errorMessage);
       }
       return result;
     },
@@ -137,9 +151,13 @@ export function useReorderTicket() {
     mutationFn: async (input: ReorderTicketInput) => {
       const result = await reorderTicket(input);
       if (!result.success) {
-        throw new Error(result.error || "Failed to reorder ticket");
+        const errorMessage = 'error' in result ? result.error : "Failed to reorder ticket";
+        throw new Error(errorMessage);
       }
-      return result.data;
+      if ('data' in result) {
+        return result.data;
+      }
+      throw new Error("Failed to reorder ticket");
     },
     onMutate: async (variables) => {
       // Cancel any outgoing refetches
@@ -170,12 +188,15 @@ export function useReorderTicket() {
             (t) => t.id === variables.ticketId
           );
           if (index !== -1) {
-            // Clone the ticket before removing
-            movedTicket = { ...newData[status][index] };
-            newData[status] = newData[status].filter(
-              (t) => t.id !== variables.ticketId
-            );
-            break;
+            const ticket = newData[status][index];
+            if (ticket) {
+              // Clone the ticket before removing
+              movedTicket = { ...ticket };
+              newData[status] = newData[status].filter(
+                (t) => t.id !== variables.ticketId
+              );
+              break;
+            }
           }
         }
 

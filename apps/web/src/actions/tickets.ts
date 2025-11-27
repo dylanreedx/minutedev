@@ -14,6 +14,7 @@ import {
   max,
   type TicketStatus,
   type TicketPriority,
+  type Ticket,
 } from '@minute/db';
 import { z } from 'zod';
 
@@ -196,7 +197,15 @@ export async function getTickets(projectId: string) {
     // Verify project access
     const accessCheck = await verifyProjectAccess(projectId, user.id);
     if (!accessCheck.success) {
-      return { ...accessCheck, data: [] };
+      return {
+        ...accessCheck,
+        data: {
+          backlog: [],
+          todo: [],
+          in_progress: [],
+          done: [],
+        } as Record<TicketStatus, Ticket[]>,
+      };
     }
 
     // Get all tickets for the project, ordered by status and order
@@ -222,7 +231,12 @@ export async function getTickets(projectId: string) {
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to fetch tickets',
-      data: {},
+      data: {
+        backlog: [],
+        todo: [],
+        in_progress: [],
+        done: [],
+      } as Record<TicketStatus, Ticket[]>,
     };
   }
 }

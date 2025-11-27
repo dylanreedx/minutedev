@@ -166,8 +166,11 @@ export function BoardPageClient({
   const activeTicket = useMemo(() => {
     if (!activeId || !ticketsGrouped) return null;
     for (const status of Object.keys(ticketsGrouped) as TicketStatus[]) {
-      const ticket = ticketsGrouped[status]?.find((t) => t.id === activeId);
-      if (ticket) return ticket;
+      const tickets = ticketsGrouped[status];
+      if (tickets) {
+        const ticket = tickets.find((t) => t.id === activeId);
+        if (ticket) return ticket;
+      }
     }
     return null;
   }, [activeId, ticketsGrouped]);
