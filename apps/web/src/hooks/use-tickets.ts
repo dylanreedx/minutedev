@@ -159,86 +159,18 @@ export function useReorderTicket() {
       }
       throw new Error("Failed to reorder ticket");
     },
-    onMutate: async (variables) => {
-      // Cancel any outgoing refetches
-      await queryClient.cancelQueries({
-        queryKey: ticketKeys.list(variables.projectId),
-      });
-
-      // Snapshot the previous value
-      type TicketsGrouped = Record<TicketStatus, Ticket[]>;
-      const previousData = queryClient.getQueryData<TicketsGrouped>(
-        ticketKeys.list(variables.projectId)
-      );
-
-      // Optimistically update the cache
-      if (previousData) {
-        // Deep clone to avoid mutating cache directly
-        const newData: TicketsGrouped = {
-          backlog: [...(previousData.backlog || [])],
-          todo: [...(previousData.todo || [])],
-          in_progress: [...(previousData.in_progress || [])],
-          done: [...(previousData.done || [])],
-        };
-
-        // Find and remove ticket from its current column
-        let movedTicket: Ticket | undefined;
-        for (const status of Object.keys(newData) as TicketStatus[]) {
-          const index = newData[status].findIndex(
-            (t) => t.id === variables.ticketId
-          );
-          if (index !== -1) {
-            const ticket = newData[status][index];
-            if (ticket) {
-              // Clone the ticket before removing
-              movedTicket = { ...ticket };
-              newData[status] = newData[status].filter(
-                (t) => t.id !== variables.ticketId
-              );
-              break;
-            }
-          }
-        }
-
-        // Add ticket to new column with updated order and status
-        if (movedTicket) {
-          // Create updated ticket with new status and order
-          const updatedTicket: Ticket = {
-            ...movedTicket,
-            status: variables.newStatus,
-            order: variables.newOrder,
-          };
-
-          newData[variables.newStatus] = [
-            ...newData[variables.newStatus],
-            updatedTicket,
-          ].sort((a, b) => a.order - b.order);
-        }
-
-        queryClient.setQueryData(ticketKeys.list(variables.projectId), newData);
-      }
-
-      // Return context with snapshot
-      return { previousData };
-    },
-    onError: (error: Error, variables, context) => {
-      // Rollback on error
-      if (context?.previousData) {
-        queryClient.setQueryData(
-          ticketKeys.list(variables.projectId),
-          context.previousData
-        );
-      }
+    // Note: Optimistic update is done synchronously in the board component
+    // before calling mutate() to avoid timing issues with dnd-kit transforms
+    onError: (error: Error) => {
       toast.error(error.message || "Failed to reorder ticket");
     },
-    onSettled: (_, __, variables) => {
-      // Always refetch after error or success to sync with server
-      queryClient.invalidateQueries({
-        queryKey: ticketKeys.list(variables.projectId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: ticketKeys.detail(variables.ticketId),
-      });
+    onSettled: (_, error, variables) => {
+      // Only refetch on error to sync with server state
+      if (error) {
+        queryClient.invalidateQueries({
+          queryKey: ticketKeys.list(variables.projectId),
+        });
+      }
     },
   });
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
+import { flushSync } from "react-dom";
 import Link from "next/link";
 import { List, GripVertical } from "lucide-react";
 import {
@@ -13,7 +14,6 @@ import {
   useSensors,
   type DragStartEvent,
   type DragEndEvent,
-  type DragOverEvent,
   useDroppable,
 } from "@dnd-kit/core";
 import {
@@ -28,7 +28,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CreateTicketButton } from "@/components/tickets/create-ticket-button";
 import { EditTicketDialog } from "@/components/tickets/edit-ticket-dialog";
-import { useTickets, useReorderTicket } from "@/hooks/use-tickets";
+import { useTickets, useReorderTicket, ticketKeys } from "@/hooks/use-tickets";
+import { useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { TicketStatus } from "@minute/db";
 
@@ -80,19 +81,18 @@ function SortableTicketCard({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
   };
 
   return (
     <div
       ref={setNodeRef}
       style={isDragOverlay ? undefined : style}
-      className={`rounded-md border border-border bg-background p-3 transition-shadow ${
+      className={`rounded-md border bg-background p-3 transition-shadow ${
         isDragOverlay 
-          ? "shadow-lg ring-2 ring-primary/20 cursor-grabbing" 
-          : isDragging 
-            ? "opacity-50" 
-            : "hover:shadow-sm cursor-pointer"
+          ? "shadow-lg ring-2 ring-primary/20 cursor-grabbing border-border" 
+          : isDragging
+            ? "opacity-30 border-border"
+            : "border-border hover:shadow-sm cursor-pointer"
       }`}
       onClick={isDragOverlay ? undefined : onEdit}
     >
@@ -155,6 +155,7 @@ export function BoardPageClient({
   projectId: string;
   projectName: string;
 }) {
+  const queryClient = useQueryClient();
   const { data: ticketsGrouped, isLoading, error } = useTickets(projectId);
   const reorderMutation = useReorderTicket();
   
@@ -179,7 +180,7 @@ export function BoardPageClient({
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8, // 8px movement before drag starts
+        distance: 8,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -196,9 +197,11 @@ export function BoardPageClient({
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
       const { active, over } = event;
-      setActiveId(null);
 
-      if (!over || !ticketsGrouped) return;
+      if (!over || !ticketsGrouped) {
+        setActiveId(null);
+        return;
+      }
 
       const activeTicketId = active.id as string;
       const overId = over.id as string;
@@ -225,34 +228,28 @@ export function BoardPageClient({
       let newOrder: number;
 
       if (overData?.type === "column") {
-        // Dropped on empty column area
         targetStatus = overId as TicketStatus;
         const targetTickets = ticketsGrouped[targetStatus] || [];
         newOrder = targetTickets.length > 0 
           ? Math.max(...targetTickets.map((t) => t.order)) + ORDER_GAP 
           : ORDER_GAP;
       } else if (overData?.type === "ticket") {
-        // Dropped on another ticket
         const overTicket = overData.ticket as Ticket;
         targetStatus = overTicket.status;
         
-        // Find index of over ticket in the target column
         const targetTickets = ticketsGrouped[targetStatus] || [];
         const overIndex = targetTickets.findIndex((t) => t.id === overId);
         
         if (overIndex === -1) {
-          // Fallback: place at end
           newOrder = targetTickets.length > 0 
             ? Math.max(...targetTickets.map((t) => t.order)) + ORDER_GAP 
             : ORDER_GAP;
         } else if (sourceStatus === targetStatus) {
-          // Within-column reorder
           const sourceIndex = targetTickets.findIndex((t) => t.id === activeTicketId);
           
-          if (sourceIndex === overIndex) return; // No change
+          if (sourceIndex === overIndex) return;
           
           if (sourceIndex < overIndex) {
-            // Moving down: place after the over ticket
             targetOrder = overTicket.order;
             const nextTicket = targetTickets[overIndex + 1];
             if (nextTicket && nextTicket.id !== activeTicketId) {
@@ -261,7 +258,6 @@ export function BoardPageClient({
               newOrder = overTicket.order + ORDER_GAP;
             }
           } else {
-            // Moving up: place before the over ticket
             const prevTicket = targetTickets[overIndex - 1];
             if (prevTicket && prevTicket.id !== activeTicketId) {
               targetOrder = prevTicket.order;
@@ -271,7 +267,6 @@ export function BoardPageClient({
             }
           }
         } else {
-          // Cross-column: place before the over ticket
           const prevTicket = targetTickets[overIndex - 1];
           if (prevTicket) {
             targetOrder = prevTicket.order;
@@ -281,7 +276,6 @@ export function BoardPageClient({
           }
         }
       } else {
-        // Fallback: determine from over ID (column ID)
         targetStatus = overId as TicketStatus;
         const targetTickets = ticketsGrouped[targetStatus] || [];
         newOrder = targetTickets.length > 0 
@@ -289,22 +283,76 @@ export function BoardPageClient({
           : ORDER_GAP;
       }
 
-      // Don't mutate if nothing changed
       if (sourceStatus === targetStatus && sourceTicket.order === newOrder) {
+        setActiveId(null);
         return;
       }
 
-      // Call mutation
-      reorderMutation.mutate({
-        ticketId: activeTicketId,
-        projectId,
-        newStatus: targetStatus,
-        newOrder,
-        targetOrder,
-      });
+      // SYNCHRONOUSLY update cache BEFORE clearing activeId (key to avoiding flicker)
+      // flushSync ensures React re-renders DOM before dnd-kit transforms reset
+      const previousData = queryClient.getQueryData<Record<TicketStatus, Ticket[]>>(
+        ticketKeys.list(projectId)
+      );
+      
+      if (previousData) {
+        const newData: Record<TicketStatus, Ticket[]> = {
+          backlog: [...(previousData.backlog || [])],
+          todo: [...(previousData.todo || [])],
+          in_progress: [...(previousData.in_progress || [])],
+          done: [...(previousData.done || [])],
+        };
+
+        // Remove from source
+        newData[sourceStatus] = newData[sourceStatus].filter(
+          (t) => t.id !== activeTicketId
+        );
+
+        // Add to target with new order
+        const updatedTicket: Ticket = {
+          ...sourceTicket,
+          status: targetStatus,
+          order: newOrder,
+        };
+        newData[targetStatus] = [...newData[targetStatus], updatedTicket].sort(
+          (a, b) => a.order - b.order
+        );
+
+        // Use flushSync to force synchronous DOM update before clearing overlay
+        // This prevents the "snap back then jump" flicker
+        flushSync(() => {
+          queryClient.setQueryData(ticketKeys.list(projectId), newData);
+        });
+
+        // NOW safe to clear activeId - DOM is already in the new position
+        setActiveId(null);
+
+        // Fire mutation to sync with server (cache already updated)
+        reorderMutation.mutate(
+          {
+            ticketId: activeTicketId,
+            projectId,
+            newStatus: targetStatus,
+            newOrder,
+            targetOrder,
+          },
+          {
+            // Rollback on error
+            onError: () => {
+              queryClient.setQueryData(ticketKeys.list(projectId), previousData);
+            },
+          }
+        );
+      } else {
+        setActiveId(null);
+      }
     },
-    [ticketsGrouped, projectId, reorderMutation]
+    [ticketsGrouped, projectId, reorderMutation, queryClient]
   );
+
+  // Handle drag cancel
+  const handleDragCancel = useCallback(() => {
+    setActiveId(null);
+  }, []);
 
   return (
     <>
@@ -345,6 +393,7 @@ export function BoardPageClient({
             collisionDetection={closestCorners}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
+            onDragCancel={handleDragCancel}
           >
             <div className="flex gap-4 h-full">
               {columns.map((column) => {
@@ -393,8 +442,8 @@ export function BoardPageClient({
               })}
             </div>
 
-            {/* Drag overlay */}
-            <DragOverlay>
+            {/* Drag overlay - no drop animation for instant feel */}
+            <DragOverlay dropAnimation={null}>
               {activeTicket ? (
                 <SortableTicketCard
                   ticket={activeTicket}
