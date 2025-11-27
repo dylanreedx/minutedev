@@ -1,24 +1,27 @@
-"use server";
+'use server';
 
-import { headers } from "next/headers";
-import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth";
-import { db, projects } from "@minute/db";
-import { eq, desc } from "drizzle-orm";
-import { z } from "zod";
+import { headers } from 'next/headers';
+import { revalidatePath } from 'next/cache';
+import { auth } from '@/lib/auth';
+import { db, projects } from '@minute/db';
+import { eq, desc } from 'drizzle-orm';
+import { z } from 'zod';
 
 // Utility function to generate slug from name
 function generateSlug(name: string): string {
   return name
     .toLowerCase()
     .trim()
-    .replace(/[^\w\s-]/g, "") // Remove special characters
-    .replace(/[\s_-]+/g, "-") // Replace spaces and underscores with hyphens
-    .replace(/^-+|-+$/g, ""); // Remove leading/trailing hyphens
+    .replace(/[^\w\s-]/g, '') // Remove special characters
+    .replace(/[\s_-]+/g, '-') // Replace spaces and underscores with hyphens
+    .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
 }
 
 // Ensure slug is unique by appending a number if needed
-async function ensureUniqueSlug(baseSlug: string, excludeId?: string): Promise<string> {
+async function ensureUniqueSlug(
+  baseSlug: string,
+  excludeId?: string
+): Promise<string> {
   let slug = baseSlug;
   let counter = 1;
 
@@ -45,7 +48,7 @@ async function getCurrentUser() {
   });
 
   if (!session) {
-    throw new Error("Unauthorized");
+    throw new Error('Unauthorized');
   }
 
   return session.user;
@@ -53,18 +56,24 @@ async function getCurrentUser() {
 
 // Validation schemas
 const createProjectSchema = z.object({
-  name: z.string().min(1, "Name is required").max(100),
+  name: z.string().min(1, 'Name is required').max(100),
   description: z.string().max(500).optional(),
 });
 
 const updateProjectSchema = z.object({
   id: z.string(),
-  name: z.string().min(1, "Name is required").max(100).optional(),
+  name: z.string().min(1, 'Name is required').max(100).optional(),
   description: z.string().max(500).optional(),
 });
 
+// Export types for use in hooks
+export type CreateProjectInput = z.infer<typeof createProjectSchema>;
+export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
+
 // Server Actions
-export async function createProject(input: z.infer<typeof createProjectSchema>) {
+export async function createProject(
+  input: z.infer<typeof createProjectSchema>
+) {
   try {
     const user = await getCurrentUser();
     const validated = createProjectSchema.parse(input);
@@ -85,21 +94,22 @@ export async function createProject(input: z.infer<typeof createProjectSchema>) 
       .returning();
 
     // Revalidate projects list page
-    revalidatePath("/projects");
+    revalidatePath('/projects');
 
     return { success: true, data: project };
   } catch (error) {
-    console.error("Error creating project:", error);
+    console.error('Error creating project:', error);
     if (error instanceof z.ZodError) {
       return {
         success: false,
-        error: "Validation error",
+        error: 'Validation error',
         details: error.errors,
       };
     }
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to create project",
+      error:
+        error instanceof Error ? error.message : 'Failed to create project',
     };
   }
 }
@@ -117,10 +127,11 @@ export async function getProjects() {
 
     return { success: true, data: userProjects };
   } catch (error) {
-    console.error("Error fetching projects:", error);
+    console.error('Error fetching projects:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to fetch projects",
+      error:
+        error instanceof Error ? error.message : 'Failed to fetch projects',
       data: [],
     };
   }
@@ -140,7 +151,7 @@ export async function getProject(slug: string) {
     if (!project) {
       return {
         success: false,
-        error: "Project not found",
+        error: 'Project not found',
       };
     }
 
@@ -148,21 +159,23 @@ export async function getProject(slug: string) {
     if (project.ownerId !== user.id) {
       return {
         success: false,
-        error: "Unauthorized",
+        error: 'Unauthorized',
       };
     }
 
     return { success: true, data: project };
   } catch (error) {
-    console.error("Error fetching project:", error);
+    console.error('Error fetching project:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to fetch project",
+      error: error instanceof Error ? error.message : 'Failed to fetch project',
     };
   }
 }
 
-export async function updateProject(input: z.infer<typeof updateProjectSchema>) {
+export async function updateProject(
+  input: z.infer<typeof updateProjectSchema>
+) {
   try {
     const user = await getCurrentUser();
     const validated = updateProjectSchema.parse(input);
@@ -177,14 +190,14 @@ export async function updateProject(input: z.infer<typeof updateProjectSchema>) 
     if (!existing) {
       return {
         success: false,
-        error: "Project not found",
+        error: 'Project not found',
       };
     }
 
     if (existing.ownerId !== user.id) {
       return {
         success: false,
-        error: "Unauthorized",
+        error: 'Unauthorized',
       };
     }
 
@@ -219,22 +232,23 @@ export async function updateProject(input: z.infer<typeof updateProjectSchema>) 
       .returning();
 
     // Revalidate relevant paths
-    revalidatePath("/projects");
+    revalidatePath('/projects');
     revalidatePath(`/projects/${updated.slug}`);
 
     return { success: true, data: updated };
   } catch (error) {
-    console.error("Error updating project:", error);
+    console.error('Error updating project:', error);
     if (error instanceof z.ZodError) {
       return {
         success: false,
-        error: "Validation error",
+        error: 'Validation error',
         details: error.errors,
       };
     }
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to update project",
+      error:
+        error instanceof Error ? error.message : 'Failed to update project',
     };
   }
 }
@@ -253,14 +267,14 @@ export async function deleteProject(projectId: string) {
     if (!existing) {
       return {
         success: false,
-        error: "Project not found",
+        error: 'Project not found',
       };
     }
 
     if (existing.ownerId !== user.id) {
       return {
         success: false,
-        error: "Unauthorized",
+        error: 'Unauthorized',
       };
     }
 
@@ -268,15 +282,15 @@ export async function deleteProject(projectId: string) {
     await db.delete(projects).where(eq(projects.id, projectId));
 
     // Revalidate projects list page
-    revalidatePath("/projects");
+    revalidatePath('/projects');
 
     return { success: true };
   } catch (error) {
-    console.error("Error deleting project:", error);
+    console.error('Error deleting project:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to delete project",
+      error:
+        error instanceof Error ? error.message : 'Failed to delete project',
     };
   }
 }
-
