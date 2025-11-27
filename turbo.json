@@ -8,7 +8,9 @@
     "GITHUB_CLIENT_ID",
     "RESEND_API_KEY",
     "BETTER_AUTH_SECRET",
-    "VITE_BETTER_AUTH_URL"
+    "VITE_BETTER_AUTH_URL",
+    "UPLOADTHING_TOKEN",
+    "UPLOADTHING_SECRET_KEY"
   ],
   "tasks": {
     "build": {
