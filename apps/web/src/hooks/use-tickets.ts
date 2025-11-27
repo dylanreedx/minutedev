@@ -164,8 +164,16 @@ export function useReorderTicket() {
     onError: (error: Error) => {
       toast.error(error.message || "Failed to reorder ticket");
     },
+    onSuccess: (data, variables) => {
+      // Invalidate ticket detail query to ensure edit dialog shows updated status
+      // This is especially important when status changes during cross-column drags
+      queryClient.invalidateQueries({
+        queryKey: ticketKeys.detail(variables.ticketId),
+      });
+    },
     onSettled: (_, error, variables) => {
-      // Only refetch on error to sync with server state
+      // Only refetch list on error to sync with server state
+      // On success, we trust the optimistic update and only invalidate detail query
       if (error) {
         queryClient.invalidateQueries({
           queryKey: ticketKeys.list(variables.projectId),

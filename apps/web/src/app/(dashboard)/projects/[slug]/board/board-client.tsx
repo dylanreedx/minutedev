@@ -294,6 +294,11 @@ export function BoardPageClient({
         ticketKeys.list(projectId)
       );
       
+      // Also capture previous detail cache for rollback
+      const previousDetail = queryClient.getQueryData(
+        ticketKeys.detail(activeTicketId)
+      );
+      
       if (previousData) {
         const newData: Record<TicketStatus, Ticket[]> = {
           backlog: [...(previousData.backlog || [])],
@@ -302,15 +307,17 @@ export function BoardPageClient({
           done: [...(previousData.done || [])],
         };
 
-        // Remove from source
+        // Remove from source column
         newData[sourceStatus] = newData[sourceStatus].filter(
           (t) => t.id !== activeTicketId
         );
 
-        // Add to target with new order
+        // Add to target column with updated status and order
+        // Status is updated here for cross-column drags (sourceStatus !== targetStatus)
+        // and preserved for within-column reorders (sourceStatus === targetStatus)
         const updatedTicket: Ticket = {
           ...sourceTicket,
-          status: targetStatus,
+          status: targetStatus, // Always update status - handles both cross-column and same-column
           order: newOrder,
         };
         newData[targetStatus] = [...newData[targetStatus], updatedTicket].sort(
@@ -321,6 +328,15 @@ export function BoardPageClient({
         // This prevents the "snap back then jump" flicker
         flushSync(() => {
           queryClient.setQueryData(ticketKeys.list(projectId), newData);
+          
+          // Also update the ticket detail cache if it exists (for edit dialog)
+          // This ensures the edit dialog shows the updated status immediately
+          const existingDetail = queryClient.getQueryData(
+            ticketKeys.detail(activeTicketId)
+          );
+          if (existingDetail) {
+            queryClient.setQueryData(ticketKeys.detail(activeTicketId), updatedTicket);
+          }
         });
 
         // NOW safe to clear activeId - DOM is already in the new position
@@ -339,6 +355,10 @@ export function BoardPageClient({
             // Rollback on error
             onError: () => {
               queryClient.setQueryData(ticketKeys.list(projectId), previousData);
+              // Also rollback detail cache if it existed
+              if (previousDetail) {
+                queryClient.setQueryData(ticketKeys.detail(activeTicketId), previousDetail);
+              }
             },
           }
         );
