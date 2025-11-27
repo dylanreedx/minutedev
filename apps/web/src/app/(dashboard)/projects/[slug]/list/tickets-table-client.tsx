@@ -8,7 +8,7 @@ import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CreateTicketButton } from "@/components/tickets/create-ticket-button";
-import { EditTicketDialog } from "@/components/tickets/edit-ticket-dialog";
+import { EditTicketSheet } from "@/components/tickets/edit-ticket-sheet";
 import { useTickets } from "@/hooks/use-tickets";
 import {
   Table,
@@ -115,7 +115,7 @@ export function TicketsTableClient({ slug, projectId, projectName }: { slug: str
         </div>
       </div>
 
-      <EditTicketDialog
+      <EditTicketSheet
         open={isEditDialogOpen}
         onOpenChange={(open) => {
           setIsEditDialogOpen(open);

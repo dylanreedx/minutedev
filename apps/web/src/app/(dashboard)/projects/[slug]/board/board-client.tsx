@@ -30,7 +30,7 @@ import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CreateTicketButton } from "@/components/tickets/create-ticket-button";
-import { EditTicketDialog } from "@/components/tickets/edit-ticket-dialog";
+import { EditTicketSheet } from "@/components/tickets/edit-ticket-sheet";
 import { useTickets, useReorderTicket, ticketKeys } from "@/hooks/use-tickets";
 import { useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -637,7 +637,7 @@ export function BoardPageClient({
         )}
       </div>
 
-      <EditTicketDialog
+      <EditTicketSheet
         open={isEditDialogOpen}
         onOpenChange={(open) => {
           setIsEditDialogOpen(open);
