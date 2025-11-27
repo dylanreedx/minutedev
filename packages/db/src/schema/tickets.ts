@@ -32,6 +32,7 @@ export const tickets = sqliteTable(
       onDelete: 'set null',
     }),
     dueDate: integer('due_date', { mode: 'timestamp' }),
+    points: integer('points'), // Story points for estimation
     metadata: text('metadata', { mode: 'json' }).$type<
       Record<string, unknown>
     >(),

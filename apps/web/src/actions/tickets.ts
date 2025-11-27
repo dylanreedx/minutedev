@@ -62,6 +62,7 @@ const createTicketSchema = z.object({
   priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
   assigneeId: z.string().optional(),
   dueDate: z.number().optional(),
+  points: z.number().int().positive().optional().nullable(),
 });
 
 const updateTicketSchema = z.object({
@@ -72,6 +73,7 @@ const updateTicketSchema = z.object({
   priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
   assigneeId: z.string().nullable().optional(),
   dueDate: z.number().nullable().optional(),
+  points: z.number().int().positive().optional().nullable(),
 });
 
 const reorderTicketSchema = z.object({
@@ -162,6 +164,7 @@ export async function createTicket(input: z.infer<typeof createTicketSchema>) {
               return date;
             })()
           : null,
+        points: validated.points ?? null,
         updatedAt: new Date(),
       })
       .returning();
@@ -308,6 +311,7 @@ export async function updateTicket(input: z.infer<typeof updateTicketSchema>) {
       priority?: TicketPriority;
       assigneeId?: string | null;
       dueDate?: Date | null;
+      points?: number | null;
       order?: number;
       updatedAt: Date;
     } = {
@@ -345,6 +349,10 @@ export async function updateTicket(input: z.infer<typeof updateTicketSchema>) {
     if (validated.dueDate !== undefined) {
       updateData.dueDate =
         validated.dueDate !== null ? new Date(validated.dueDate * 1000) : null;
+    }
+
+    if (validated.points !== undefined) {
+      updateData.points = validated.points;
     }
 
     // Update ticket

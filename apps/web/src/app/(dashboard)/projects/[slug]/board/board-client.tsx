@@ -52,6 +52,7 @@ type Ticket = {
   id: string;
   title: string;
   priority: string | null;
+  points: number | null;
   order: number;
   status: TicketStatus;
 };
@@ -119,11 +120,18 @@ function SortableTicketCard({
         </button>
         <div className="flex-1 min-w-0">
           <h4 className="font-medium text-sm mb-1 truncate">{ticket.title}</h4>
-          {ticket.priority && (
-            <Badge variant="outline" className="text-xs">
-              {ticket.priority}
-            </Badge>
-          )}
+          <div className="flex items-center gap-2 flex-wrap">
+            {ticket.priority && (
+              <Badge variant="outline" className="text-xs">
+                {ticket.priority}
+              </Badge>
+            )}
+            {ticket.points !== null && ticket.points !== undefined && (
+              <Badge variant="secondary" className="text-xs">
+                {ticket.points} {ticket.points === 1 ? 'pt' : 'pts'}
+              </Badge>
+            )}
+          </div>
         </div>
       </div>
     </div>

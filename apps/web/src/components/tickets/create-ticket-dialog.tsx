@@ -62,6 +62,7 @@ export function CreateTicketDialog({
   const [status, setStatus] = useState<TicketStatus>("backlog");
   const [priority, setPriority] = useState<TicketPriority>("medium");
   const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
+  const [points, setPoints] = useState<string>("");
 
   const createTicket = useCreateTicket();
   const isLoading = createTicket.isPending;
@@ -81,6 +82,7 @@ export function CreateTicketDialog({
         status,
         priority,
         dueDate: dueDate ? Math.floor(dueDate.getTime() / 1000) : undefined,
+        points: points ? parseInt(points, 10) : undefined,
       });
 
       // Reset form and close dialog on success
@@ -89,6 +91,7 @@ export function CreateTicketDialog({
       setStatus("backlog");
       setPriority("medium");
       setDueDate(undefined);
+      setPoints("");
       onOpenChange(false);
     } catch (error) {
       // Error handling is done in the mutation hook
@@ -106,6 +109,7 @@ export function CreateTicketDialog({
         setStatus("backlog");
         setPriority("medium");
         setDueDate(undefined);
+        setPoints("");
       }
     }
   };
@@ -221,6 +225,28 @@ export function CreateTicketDialog({
                 />
               </PopoverContent>
             </Popover>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="points">Story Points (optional)</Label>
+            <Input
+              id="points"
+              type="number"
+              min="1"
+              placeholder="e.g., 1, 2, 3, 5, 8, 13"
+              value={points}
+              onChange={(e) => {
+                const value = e.target.value;
+                // Only allow positive integers
+                if (value === "" || /^\d+$/.test(value)) {
+                  setPoints(value);
+                }
+              }}
+              disabled={isLoading}
+            />
+            <p className="text-muted-foreground text-xs">
+              Estimate effort using story points
+            </p>
           </div>
 
           <DialogFooter>

@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
+import { Settings } from 'lucide-react';
 import { Header } from '@/components/layout/header';
 import {
   Card,
@@ -10,11 +12,24 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import { CreateProjectButton } from './create-project-button';
+import { EditProjectSheet } from '@/components/projects';
 import { useProjects } from '@/hooks/use-projects';
 
 export default function ProjectsPage() {
   const { data: projects = [], isLoading, error } = useProjects();
+  const [editSheetOpen, setEditSheetOpen] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<{
+    slug: string;
+  } | null>(null);
+
+  const handleEdit = (e: React.MouseEvent, project: { slug: string }) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedProject(project);
+    setEditSheetOpen(true);
+  };
 
   return (
     <>
@@ -30,9 +45,17 @@ export default function ProjectsPage() {
         ) : projects.length === 0 ? (
           <EmptyState />
         ) : (
-          <ProjectsGrid projects={projects} />
+          <ProjectsGrid projects={projects} onEdit={handleEdit} />
         )}
       </div>
+
+      {selectedProject && (
+        <EditProjectSheet
+          open={editSheetOpen}
+          onOpenChange={setEditSheetOpen}
+          projectSlug={selectedProject.slug}
+        />
+      )}
     </>
   );
 }
@@ -82,19 +105,33 @@ function EmptyState() {
 
 function ProjectsGrid({
   projects,
+  onEdit,
 }: {
   projects: Array<{
     id: string;
     name: string;
     description: string | null;
     slug: string;
+    ticketCount?: number;
   }>;
+  onEdit: (e: React.MouseEvent, project: { slug: string }) => void;
 }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {projects.map((project) => (
-        <Link key={project.id} href={`/projects/${project.slug}`}>
-          <Card className="transition-colors hover:bg-accent/50 cursor-pointer h-full">
+        <Card
+          key={project.id}
+          className="transition-colors hover:bg-accent/50 h-full flex flex-col relative"
+        >
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-2 right-2 h-8 w-8 z-10"
+            onClick={(e) => onEdit(e, project)}
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
+          <Link href={`/projects/${project.slug}`} className="flex-1">
             <CardHeader>
               <CardTitle>{project.name}</CardTitle>
               {project.description && (
@@ -105,12 +142,14 @@ function ProjectsGrid({
             </CardHeader>
             <CardContent>
               <div className="text-muted-foreground text-sm">
-                {/* Ticket count will be added in Phase 3 */}
-                <span>0 tickets</span>
+                <span>
+                  {project.ticketCount ?? 0}{' '}
+                  {project.ticketCount === 1 ? 'ticket' : 'tickets'}
+                </span>
               </div>
             </CardContent>
-          </Card>
-        </Link>
+          </Link>
+        </Card>
       ))}
     </div>
   );

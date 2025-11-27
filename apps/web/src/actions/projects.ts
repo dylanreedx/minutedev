@@ -3,7 +3,7 @@
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { auth } from '@/lib/auth';
-import { db, projects, eq, desc } from '@minute/db';
+import { db, projects, tickets, eq, desc, sql, count } from '@minute/db';
 import { z } from 'zod';
 
 // Utility function to generate slug from name
@@ -117,11 +117,25 @@ export async function getProjects() {
   try {
     const user = await getCurrentUser();
 
-    // Get all projects owned by the user
+    // Get all projects owned by the user with ticket counts
     const userProjects = await db
-      .select()
+      .select({
+        id: projects.id,
+        name: projects.name,
+        description: projects.description,
+        slug: projects.slug,
+        ownerId: projects.ownerId,
+        metadata: projects.metadata,
+        createdAt: projects.createdAt,
+        updatedAt: projects.updatedAt,
+        ticketCount: sql<number>`COALESCE(COUNT(${tickets.id}), 0)`.as(
+          'ticketCount'
+        ),
+      })
       .from(projects)
+      .leftJoin(tickets, eq(projects.id, tickets.projectId))
       .where(eq(projects.ownerId, user.id))
+      .groupBy(projects.id)
       .orderBy(desc(projects.createdAt));
 
     return { success: true, data: userProjects };

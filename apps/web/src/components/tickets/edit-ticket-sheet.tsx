@@ -78,6 +78,7 @@ export function EditTicketSheet({
   const [status, setStatus] = useState<TicketStatus>("backlog");
   const [priority, setPriority] = useState<TicketPriority>("medium");
   const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
+  const [points, setPoints] = useState<string>("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Initialize form when ticket data loads
@@ -94,6 +95,7 @@ export function EditTicketSheet({
             : new Date(ticket.dueDate)
           : undefined
       );
+      setPoints(ticket.points?.toString() || "");
     }
   }, [ticket]);
 
@@ -115,6 +117,7 @@ export function EditTicketSheet({
         status,
         priority,
         dueDate: dueDate ? Math.floor(dueDate.getTime() / 1000) : null,
+        points: points ? parseInt(points, 10) : null,
       });
 
       onOpenChange(false);
@@ -273,6 +276,28 @@ export function EditTicketSheet({
                       />
                     </PopoverContent>
                   </Popover>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-points">Story Points (optional)</Label>
+                  <Input
+                    id="edit-points"
+                    type="number"
+                    min="1"
+                    placeholder="e.g., 1, 2, 3, 5, 8, 13"
+                    value={points}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      // Only allow positive integers
+                      if (value === "" || /^\d+$/.test(value)) {
+                        setPoints(value);
+                      }
+                    }}
+                    disabled={isFormLoading}
+                  />
+                  <p className="text-muted-foreground text-xs">
+                    Estimate effort using story points
+                  </p>
                 </div>
                 </div>
 
