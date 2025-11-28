@@ -132,7 +132,7 @@ function SortableTicketCard({
     <div
       ref={setNodeRef}
       style={isDragOverlay ? undefined : style}
-      className={`rounded-md border bg-background p-3 transition-shadow ${
+      className={`w-full rounded-md border bg-background p-3 transition-shadow ${
         isDragOverlay 
           ? "shadow-lg ring-2 ring-primary/20 cursor-grabbing border-border" 
           : "border-border hover:shadow-sm cursor-pointer"
@@ -149,7 +149,7 @@ function SortableTicketCard({
           <GripVertical className="h-4 w-4" />
         </button>
         <div className="flex-1 min-w-0">
-          <h4 className="font-medium text-sm mb-1 truncate">{ticket.title}</h4>
+          <h4 className="font-medium text-sm mb-1 line-clamp-3">{ticket.title}</h4>
           <div className="flex items-center gap-2 flex-wrap">
             {ticket.priority && (
               <Badge variant="outline" className="text-xs">
@@ -608,7 +608,7 @@ export function BoardPageClient({
             {columns.map((column) => (
               <div
                 key={column.id}
-                className={`min-w-[300px] flex-shrink-0 rounded-lg ${column.color} p-4`}
+                className={`w-[300px] flex-shrink-0 rounded-lg ${column.color} p-4`}
               >
                 <Skeleton className="h-6 w-24 mb-4" />
                 <Skeleton className="h-20 w-full mb-2" />
@@ -661,7 +661,7 @@ export function BoardPageClient({
                   <DroppableColumn
                     key={column.id}
                     id={column.id}
-                    className={`min-w-[300px] flex-shrink-0 rounded-lg ${column.color} p-4 transition-all`}
+                    className={`w-[300px] flex-shrink-0 rounded-lg ${column.color} p-4 transition-all`}
                     overId={overId}
                     ticketsGrouped={filteredTicketsGrouped || undefined}
                   >
