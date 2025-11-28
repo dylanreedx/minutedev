@@ -65,3 +65,4 @@ export type ActivityLog = typeof activityLog.$inferSelect;
 export type NewActivityLog = typeof activityLog.$inferInsert;
 
 
+
