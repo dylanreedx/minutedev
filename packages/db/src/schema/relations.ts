@@ -3,6 +3,7 @@ import { users, sessions, accounts } from "./auth";
 import { projects } from "./projects";
 import { tickets } from "./tickets";
 import { ticketHistory, activityLog } from "./activity";
+import { comments } from "./comments";
 
 // User relations
 export const usersRelations = relations(users, ({ many }) => ({
@@ -13,6 +14,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   assignedTickets: many(tickets, { relationName: "assignee" }),
   ticketHistory: many(ticketHistory),
   activityLogs: many(activityLog),
+  comments: many(comments),
 }));
 
 // Session relations
@@ -50,6 +52,7 @@ export const ticketsRelations = relations(tickets, ({ one, many }) => ({
   }),
   history: many(ticketHistory),
   activityLogs: many(activityLog),
+  comments: many(comments),
 }));
 
 // Ticket history relations
@@ -78,6 +81,24 @@ export const activityLogRelations = relations(activityLog, ({ one }) => ({
     fields: [activityLog.userId],
     references: [users.id],
   }),
+}));
+
+// Comment relations
+export const commentsRelations = relations(comments, ({ one, many }) => ({
+  ticket: one(tickets, {
+    fields: [comments.ticketId],
+    references: [tickets.id],
+  }),
+  user: one(users, {
+    fields: [comments.userId],
+    references: [users.id],
+  }),
+  parent: one(comments, {
+    fields: [comments.parentId],
+    references: [comments.id],
+    relationName: "parent",
+  }),
+  replies: many(comments, { relationName: "parent" }),
 }));
 
 

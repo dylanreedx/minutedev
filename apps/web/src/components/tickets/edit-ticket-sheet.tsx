@@ -40,6 +40,9 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useTicket, useUpdateTicket, useDeleteTicket } from "@/hooks/use-tickets";
+import { useProjectMembers } from "@/hooks/use-projects";
+import { CommentsSection } from "@/components/tickets/comments-section";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { TicketStatus, TicketPriority } from "@minute/db";
 
 interface EditTicketSheetProps {
@@ -79,7 +82,16 @@ export function EditTicketSheet({
   const [priority, setPriority] = useState<TicketPriority>("medium");
   const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
   const [points, setPoints] = useState<string>("");
+  const [assigneeId, setAssigneeId] = useState<string>("unassigned");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Fetch project members for assignee selection
+  const { data: members = [], isLoading: isLoadingMembers } = useProjectMembers(
+    ticket?.projectId || "",
+    {
+      enabled: !!ticket?.projectId && open,
+    }
+  );
 
   // Initialize form when ticket data loads
   useEffect(() => {
@@ -96,6 +108,7 @@ export function EditTicketSheet({
           : undefined
       );
       setPoints(ticket.points?.toString() || "");
+      setAssigneeId(ticket.assigneeId || "unassigned");
     }
   }, [ticket]);
 
@@ -116,6 +129,7 @@ export function EditTicketSheet({
         description: description.trim() || undefined,
         status,
         priority,
+        assigneeId: assigneeId === "unassigned" ? null : assigneeId || null,
         dueDate: dueDate ? Math.floor(dueDate.getTime() / 1000) : null,
         points: points ? parseInt(points, 10) : null,
       });
@@ -298,6 +312,42 @@ export function EditTicketSheet({
                   <p className="text-muted-foreground text-xs">
                     Estimate effort using story points
                   </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-assignee">Assignee</Label>
+                  <Select
+                    value={assigneeId}
+                    onValueChange={setAssigneeId}
+                    disabled={isFormLoading || isLoadingMembers}
+                  >
+                    <SelectTrigger id="edit-assignee">
+                      <SelectValue placeholder="Unassigned" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
+                      {members.map((member) => (
+                        <SelectItem key={member.id} value={member.id}>
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-5 w-5">
+                              <AvatarImage
+                                src={member.image || undefined}
+                                alt={member.name || member.email}
+                              />
+                              <AvatarFallback className="text-xs">
+                                {(member.name || member.email)[0].toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span>{member.name || member.email}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="pt-4 border-t">
+                  <CommentsSection ticketId={ticketId} />
                 </div>
                 </div>
 
