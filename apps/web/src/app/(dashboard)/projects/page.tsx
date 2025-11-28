@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Settings } from 'lucide-react';
+import { Settings, ClipboardList } from 'lucide-react';
 import { Header } from '@/components/layout/header';
+import { EmptyState } from '@/components/ui/empty-state';
 import {
   Card,
   CardContent,
@@ -43,7 +44,12 @@ export default function ProjectsPage() {
         ) : error ? (
           <ErrorState error={error} />
         ) : projects.length === 0 ? (
-          <EmptyState />
+          <EmptyState
+            icon={ClipboardList}
+            title="No projects yet"
+            description="Create your first project to get started tracking your work."
+            action={<CreateProjectButton />}
+          />
         ) : (
           <ProjectsGrid projects={projects} onEdit={handleEdit} />
         )}
@@ -90,18 +96,7 @@ function ErrorState({ error }: { error: Error }) {
   );
 }
 
-function EmptyState() {
-  return (
-    <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border p-12 text-center">
-      <div className="mb-4 text-4xl">📋</div>
-      <h3 className="mb-2 text-lg font-medium">No projects yet</h3>
-      <p className="mb-4 text-sm text-muted-foreground">
-        Create your first project to get started
-      </p>
-      <CreateProjectButton />
-    </div>
-  );
-}
+
 
 function ProjectsGrid({
   projects,

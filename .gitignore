@@ -18,6 +18,7 @@ apps/web/.env.local
 .idea
 .vscode
 .cursor
+.agent/**
 *.swp
 *.swo
 .DS_Store
@@ -29,6 +30,7 @@ apps/web/.env.local
 *.log
 npm-debug.log*
 pnpm-debug.log*
+docs/
 
 # Testing
 coverage
