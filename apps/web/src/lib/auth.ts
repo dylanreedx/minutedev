@@ -1,9 +1,10 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
-import { emailOTP } from "better-auth/plugins";
+import { emailOTP, organization } from "better-auth/plugins";
 import { db, users, sessions, accounts, verifications } from "@minute/db";
 import { Resend } from "resend";
+import { ac, owner, admin, member } from "./permissions";
 
 // Lazy initialization of Resend client
 let resendInstance: Resend | null = null;
@@ -44,6 +45,15 @@ export const auth = betterAuth({
     },
   },
   plugins: [
+    organization({
+      ac,
+      roles: { owner, admin, member },
+      teams: {
+        enabled: true,
+        maximumTeams: 10,
+        allowRemovingAllTeams: false,
+      },
+    }),
     emailOTP({
       overrideDefaultEmailVerification: true, // Use OTP instead of verification links
       sendVerificationOnSignUp: true, // Send OTP automatically on sign up

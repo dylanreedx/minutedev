@@ -14,6 +14,7 @@ export const projects = sqliteTable(
     ownerId: text("owner_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id"), // Links to Better Auth organization table
     metadata: text("metadata", { mode: "json" }).$type<Record<string, unknown>>(),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
@@ -25,6 +26,7 @@ export const projects = sqliteTable(
   (table) => ({
     ownerIdx: index("projects_owner_idx").on(table.ownerId),
     slugIdx: index("projects_slug_idx").on(table.slug),
+    organizationIdx: index("projects_organization_idx").on(table.organizationId),
   })
 );
 

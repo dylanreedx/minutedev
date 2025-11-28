@@ -3,7 +3,7 @@
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { auth } from '@/lib/auth';
-import { db, projects, tickets, eq, desc, sql, count } from '@minute/db';
+import { db, projects, tickets, users, eq, desc, sql, count, inArray } from '@minute/db';
 import { z } from 'zod';
 
 // Utility function to generate slug from name
@@ -51,6 +51,51 @@ async function getCurrentUser() {
   }
 
   return session.user;
+}
+
+// Verify project permission
+async function verifyProjectPermission(
+  projectId: string,
+  permission: 'create' | 'read' | 'update' | 'delete' | 'assign' | 'comment'
+) {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) {
+    return { success: false, error: 'Unauthorized' };
+  }
+
+  const [project] = await db
+    .select()
+    .from(projects)
+    .where(eq(projects.id, projectId))
+    .limit(1);
+
+  if (!project) {
+    return { success: false, error: 'Project not found' };
+  }
+
+  // For backward compatibility: if no organizationId, check ownership
+  if (!project.organizationId) {
+    if (project.ownerId !== session.user.id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    return { success: true, project };
+  }
+
+  // Check organization permission
+  const hasPermission = await auth.api.hasPermission({
+    headers: await headers(),
+    body: {
+      permissions: {
+        project: [permission],
+      },
+    },
+  });
+
+  if (!hasPermission) {
+    return { success: false, error: 'Insufficient permissions' };
+  }
+
+  return { success: true, project };
 }
 
 // Validation schemas
@@ -168,12 +213,10 @@ export async function getProject(slug: string) {
       };
     }
 
-    // Check ownership
-    if (project.ownerId !== user.id) {
-      return {
-        success: false,
-        error: 'Unauthorized',
-      };
+    // Check permission (read access)
+    const accessCheck = await verifyProjectPermission(project.id, 'read');
+    if (!accessCheck.success) {
+      return accessCheck;
     }
 
     return { success: true, data: project };
@@ -207,11 +250,10 @@ export async function updateProject(
       };
     }
 
-    if (existing.ownerId !== user.id) {
-      return {
-        success: false,
-        error: 'Unauthorized',
-      };
+    // Check permission (update access)
+    const accessCheck = await verifyProjectPermission(existing.id, 'update');
+    if (!accessCheck.success) {
+      return accessCheck;
     }
 
     // Prepare update data
@@ -291,11 +333,10 @@ export async function deleteProject(projectId: string) {
       };
     }
 
-    if (existing.ownerId !== user.id) {
-      return {
-        success: false,
-        error: 'Unauthorized',
-      };
+    // Check permission (delete access)
+    const accessCheck = await verifyProjectPermission(existing.id, 'delete');
+    if (!accessCheck.success) {
+      return accessCheck;
     }
 
     // Delete project (cascade will handle tickets)
@@ -311,6 +352,126 @@ export async function deleteProject(projectId: string) {
       success: false,
       error:
         error instanceof Error ? error.message : 'Failed to delete project',
+    };
+  }
+}
+
+export async function getProjectMembers(projectId: string) {
+  try {
+    const user = await getCurrentUser();
+
+    // Get project
+    const [project] = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.id, projectId))
+      .limit(1);
+
+    if (!project) {
+      return {
+        success: false,
+        error: 'Project not found',
+        data: [],
+      };
+    }
+
+    // Verify project permission (read access)
+    const accessCheck = await verifyProjectPermission(project.id, 'read');
+    if (!accessCheck.success) {
+      return {
+        ...accessCheck,
+        data: [],
+      };
+    }
+
+    // If no organizationId, return just the owner
+    if (!project.organizationId) {
+      const [owner] = await db
+        .select({
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          image: users.image,
+        })
+        .from(users)
+        .where(eq(users.id, project.ownerId))
+        .limit(1);
+
+      return {
+        success: true,
+        data: owner ? [owner] : [],
+      };
+    }
+
+    // Get organization members using Better Auth API
+    try {
+      const members = await auth.api.listMembers({
+        headers: await headers(),
+        body: {
+          organizationId: project.organizationId,
+        },
+      });
+
+      if (!members || !Array.isArray(members)) {
+        return {
+          success: true,
+          data: [],
+        };
+      }
+
+      // Extract user IDs from members
+      const userIds = members.map((member) => member.userId).filter(Boolean);
+
+      if (userIds.length === 0) {
+        return {
+          success: true,
+          data: [],
+        };
+      }
+
+      // Query users table for member details
+      const memberUsers = await db
+        .select({
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          image: users.image,
+        })
+        .from(users)
+        .where(inArray(users.id, userIds));
+
+      return {
+        success: true,
+        data: memberUsers,
+      };
+    } catch (error) {
+      // If organization API fails, fall back to owner only
+      console.error('Error fetching organization members:', error);
+      const [owner] = await db
+        .select({
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          image: users.image,
+        })
+        .from(users)
+        .where(eq(users.id, project.ownerId))
+        .limit(1);
+
+      return {
+        success: true,
+        data: owner ? [owner] : [],
+      };
+    }
+  } catch (error) {
+    console.error('Error fetching project members:', error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Failed to fetch project members',
+      data: [],
     };
   }
 }
