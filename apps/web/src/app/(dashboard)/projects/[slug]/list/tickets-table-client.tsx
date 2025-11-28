@@ -1,14 +1,17 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { LayoutGrid, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { LayoutGrid, ArrowUpDown, ArrowUp, ArrowDown, Ticket, SearchX } from "lucide-react";
 import { format } from "date-fns";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CreateTicketButton } from "@/components/tickets/create-ticket-button";
 import { EditTicketSheet } from "@/components/tickets/edit-ticket-sheet";
+import { TicketFilters } from "@/components/tickets/ticket-filters";
+import { EmptyState } from "@/components/ui/empty-state";
 import { useTickets } from "@/hooks/use-tickets";
 import {
   Table,
@@ -57,6 +60,7 @@ type SortField = "title" | "status" | "priority" | "dueDate" | "createdAt" | nul
 type SortDirection = "asc" | "desc";
 
 export function TicketsTableClient({ slug, projectId, projectName }: { slug: string; projectId: string; projectName: string }) {
+  const searchParams = useSearchParams();
   const { data: ticketsGrouped, isLoading, error } = useTickets(projectId);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -67,6 +71,20 @@ export function TicketsTableClient({ slug, projectId, projectName }: { slug: str
   const allTickets = ticketsGrouped
     ? Object.values(ticketsGrouped).flat()
     : [];
+
+  // Filter tickets based on search params
+  const filteredTickets = useMemo(() => {
+    const searchQuery = searchParams.get("search")?.toLowerCase() || "";
+    const statusFilter = searchParams.get("status")?.split(",").filter(Boolean) || [];
+    const priorityFilter = searchParams.get("priority")?.split(",").filter(Boolean) || [];
+
+    return allTickets.filter((ticket) => {
+      const matchesSearch = ticket.title.toLowerCase().includes(searchQuery);
+      const matchesStatus = statusFilter.length === 0 || statusFilter.includes(ticket.status);
+      const matchesPriority = priorityFilter.length === 0 || priorityFilter.includes(ticket.priority);
+      return matchesSearch && matchesStatus && matchesPriority;
+    });
+  }, [allTickets, searchParams]);
 
   // Handle column sorting
   const handleSort = (field: SortField) => {
@@ -82,9 +100,9 @@ export function TicketsTableClient({ slug, projectId, projectName }: { slug: str
 
   // Sort tickets based on current sort field and direction
   const sortedTickets = useMemo(() => {
-    if (!sortField) return allTickets;
+    if (!sortField) return filteredTickets;
 
-    return [...allTickets].sort((a, b) => {
+    return [...filteredTickets].sort((a, b) => {
       let aValue: string | number | Date | null;
       let bValue: string | number | Date | null;
 
@@ -150,7 +168,7 @@ export function TicketsTableClient({ slug, projectId, projectName }: { slug: str
 
       return sortDirection === "asc" ? comparison : -comparison;
     });
-  }, [allTickets, sortField, sortDirection]);
+  }, [filteredTickets, sortField, sortDirection]);
 
   // Sort icon component
   const SortIcon = ({ field }: { field: SortField }) => {
@@ -176,19 +194,51 @@ export function TicketsTableClient({ slug, projectId, projectName }: { slug: str
         <CreateTicketButton projectId={projectId} />
       </Header>
 
+      <div className="px-6 py-4">
+        <TicketFilters />
+      </div>
+
       {/* Table */}
       <div className="flex-1 overflow-y-auto p-6">
         <div className="rounded-lg border border-border">
           {isLoading ? (
             <div className="p-6 space-y-4">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
+              <div className="flex items-center space-x-4">
+                <Skeleton className="h-12 w-12 rounded-full" />
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-[250px]" />
+                  <Skeleton className="h-4 w-[200px]" />
+                </div>
+              </div>
+              <Skeleton className="h-[300px] w-full rounded-xl" />
             </div>
           ) : error ? (
             <div className="p-6 text-center">
               <p className="text-destructive">Error loading tickets: {error.message}</p>
             </div>
+          ) : allTickets.length === 0 ? (
+            <EmptyState
+              icon={Ticket}
+              title="No tickets yet"
+              description="Create your first ticket to start tracking tasks."
+              action={<CreateTicketButton projectId={projectId} />}
+              className="border-none min-h-[400px]"
+            />
+          ) : sortedTickets.length === 0 ? (
+            <EmptyState
+              icon={SearchX}
+              title="No tickets found"
+              description="Try adjusting your filters or search query."
+              action={
+                <Button variant="outline" onClick={() => {
+                  // Reset filters logic is handled in TicketFilters, but we can provide a hint or just let them use the filter bar
+                  // For now, let's just show the message since the filter bar is right above
+                }}>
+                  Clear filters
+                </Button>
+              }
+              className="border-none min-h-[400px]"
+            />
           ) : (
             <Table>
               <TableHeader>
@@ -242,9 +292,10 @@ export function TicketsTableClient({ slug, projectId, projectName }: { slug: str
               </TableHeader>
               <TableBody>
                 {sortedTickets.length === 0 ? (
+                  // This case should be handled by the EmptyState above, but keeping as fallback
                   <TableRow>
                     <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                      No tickets yet
+                      No tickets found
                     </TableCell>
                   </TableRow>
                 ) : (

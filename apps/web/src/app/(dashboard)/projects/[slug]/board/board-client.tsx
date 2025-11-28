@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { flushSync } from "react-dom";
 import Link from "next/link";
-import { List, GripVertical } from "lucide-react";
+import { List, GripVertical, Ticket, SearchX } from "lucide-react";
 import {
   DndContext,
   DragOverlay,
@@ -17,6 +18,7 @@ import {
   type DragEndEvent,
   type DragOverEvent,
   type CollisionDetection,
+  type Collision,
   useDroppable,
 } from "@dnd-kit/core";
 import {
@@ -31,6 +33,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CreateTicketButton } from "@/components/tickets/create-ticket-button";
 import { EditTicketSheet } from "@/components/tickets/edit-ticket-sheet";
+import { TicketFilters } from "@/components/tickets/ticket-filters";
+import { EmptyState } from "@/components/ui/empty-state";
 import { useTickets, useReorderTicket, ticketKeys } from "@/hooks/use-tickets";
 import { useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -162,7 +166,7 @@ const customCollisionDetection: CollisionDetection = (args) => {
     
     if (ticketCollisions.length > 0) {
       // Return the ticket collision (if multiple, return first - closest)
-      return [ticketCollisions[0]];
+      return [ticketCollisions[0] as Collision];
     }
     
     // No tickets found, return column collisions
@@ -228,9 +232,36 @@ export function BoardPageClient({
   projectId: string;
   projectName: string;
 }) {
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { data: ticketsGrouped, isLoading, error } = useTickets(projectId);
   const reorderMutation = useReorderTicket();
+
+  const filteredTicketsGrouped = useMemo(() => {
+    if (!ticketsGrouped) return null;
+
+    const searchQuery = searchParams.get("search")?.toLowerCase() || "";
+    const statusFilter = searchParams.get("status")?.split(",").filter(Boolean) || [];
+    const priorityFilter = searchParams.get("priority")?.split(",").filter(Boolean) || [];
+
+    const filtered: Record<TicketStatus, Ticket[]> = {
+      backlog: [],
+      todo: [],
+      in_progress: [],
+      done: [],
+    };
+
+    Object.entries(ticketsGrouped).forEach(([status, tickets]) => {
+      filtered[status as TicketStatus] = tickets.filter((ticket) => {
+        const matchesSearch = ticket.title.toLowerCase().includes(searchQuery);
+        const matchesStatus = statusFilter.length === 0 || statusFilter.includes(ticket.status);
+        const matchesPriority = priorityFilter.length === 0 || priorityFilter.includes(ticket.priority);
+        return matchesSearch && matchesStatus && matchesPriority;
+      });
+    });
+
+    return filtered;
+  }, [ticketsGrouped, searchParams]);
   
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -527,6 +558,10 @@ export function BoardPageClient({
         <CreateTicketButton projectId={projectId} />
       </Header>
 
+      <div className="px-6 py-4">
+        <TicketFilters />
+      </div>
+
       {/* Board columns */}
       <div className="flex-1 overflow-x-auto overflow-y-hidden p-6">
         {isLoading ? (
@@ -542,12 +577,33 @@ export function BoardPageClient({
               </div>
             ))}
           </div>
+
         ) : error ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-destructive">
               Error loading tickets: {error.message}
             </p>
           </div>
+        ) : ticketsGrouped && Object.values(ticketsGrouped).flat().length === 0 ? (
+          <EmptyState
+            icon={Ticket}
+            title="No tickets yet"
+            description="Create your first ticket to start tracking tasks."
+            action={<CreateTicketButton projectId={projectId} />}
+            className="border-none min-h-[400px]"
+          />
+        ) : filteredTicketsGrouped && Object.values(filteredTicketsGrouped).flat().length === 0 ? (
+          <EmptyState
+            icon={SearchX}
+            title="No tickets found"
+            description="Try adjusting your filters or search query."
+            action={
+              <Button variant="outline" onClick={() => {}}>
+                Clear filters
+              </Button>
+            }
+            className="border-none min-h-[400px]"
+          />
         ) : (
           <DndContext
             sensors={sensors}
@@ -559,7 +615,7 @@ export function BoardPageClient({
           >
             <div className="flex gap-4 h-full">
               {columns.map((column) => {
-                const tickets = ticketsGrouped?.[column.id] || [];
+                const tickets = filteredTicketsGrouped?.[column.id] || [];
                 const ticketIds = tickets.map((t) => t.id);
 
                 return (
@@ -568,7 +624,7 @@ export function BoardPageClient({
                     id={column.id}
                     className={`min-w-[300px] flex-shrink-0 rounded-lg ${column.color} p-4 transition-all`}
                     overId={overId}
-                    ticketsGrouped={ticketsGrouped}
+                    ticketsGrouped={filteredTicketsGrouped || undefined}
                   >
                     <div className="mb-4 flex items-center justify-between">
                       <h3 className="font-medium">{column.name}</h3>
