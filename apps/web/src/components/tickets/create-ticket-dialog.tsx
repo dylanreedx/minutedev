@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { format } from "date-fns";
-import { CalendarIcon, Loader2 } from "lucide-react";
+import { useState } from 'react';
+import { format } from 'date-fns';
+import { CalendarIcon, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -10,27 +10,29 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
+} from '@/components/ui/select';
+import { Calendar } from '@/components/ui/calendar';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
-import { useCreateTicket } from "@/hooks/use-tickets";
-import type { TicketStatus, TicketPriority } from "@minute/db";
+} from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
+import { useCreateTicket } from '@/hooks/use-tickets';
+import { useProjectMembers } from '@/hooks/use-projects';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import type { TicketStatus, TicketPriority } from '@minute/db';
 
 interface CreateTicketDialogProps {
   open: boolean;
@@ -39,17 +41,17 @@ interface CreateTicketDialogProps {
 }
 
 const statusOptions: { value: TicketStatus; label: string }[] = [
-  { value: "backlog", label: "Backlog" },
-  { value: "todo", label: "Todo" },
-  { value: "in_progress", label: "In Progress" },
-  { value: "done", label: "Done" },
+  { value: 'backlog', label: 'Backlog' },
+  { value: 'todo', label: 'Todo' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'done', label: 'Done' },
 ];
 
 const priorityOptions: { value: TicketPriority; label: string }[] = [
-  { value: "low", label: "Low" },
-  { value: "medium", label: "Medium" },
-  { value: "high", label: "High" },
-  { value: "urgent", label: "Urgent" },
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' },
+  { value: 'urgent', label: 'Urgent' },
 ];
 
 export function CreateTicketDialog({
@@ -57,14 +59,21 @@ export function CreateTicketDialog({
   onOpenChange,
   projectId,
 }: CreateTicketDialogProps) {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [status, setStatus] = useState<TicketStatus>("backlog");
-  const [priority, setPriority] = useState<TicketPriority>("medium");
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [status, setStatus] = useState<TicketStatus>('backlog');
+  const [priority, setPriority] = useState<TicketPriority>('medium');
   const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
-  const [points, setPoints] = useState<string>("");
+  const [points, setPoints] = useState<string>('');
+  const [assigneeId, setAssigneeId] = useState<string>('unassigned');
 
   const createTicket = useCreateTicket();
+  const { data: members = [], isLoading: isLoadingMembers } = useProjectMembers(
+    projectId,
+    {
+      enabled: open && !!projectId,
+    }
+  );
   const isLoading = createTicket.isPending;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -81,21 +90,24 @@ export function CreateTicketDialog({
         description: description.trim() || undefined,
         status,
         priority,
+        assigneeId:
+          assigneeId === 'unassigned' ? undefined : assigneeId || undefined,
         dueDate: dueDate ? Math.floor(dueDate.getTime() / 1000) : undefined,
         points: points ? parseInt(points, 10) : undefined,
       });
 
       // Reset form and close dialog on success
-      setTitle("");
-      setDescription("");
-      setStatus("backlog");
-      setPriority("medium");
+      setTitle('');
+      setDescription('');
+      setStatus('backlog');
+      setPriority('medium');
       setDueDate(undefined);
-      setPoints("");
+      setPoints('');
+      setAssigneeId('unassigned');
       onOpenChange(false);
     } catch (error) {
       // Error handling is done in the mutation hook
-      console.error("Error creating ticket:", error);
+      console.error('Error creating ticket:', error);
     }
   };
 
@@ -104,14 +116,31 @@ export function CreateTicketDialog({
       onOpenChange(newOpen);
       // Reset form when closing
       if (!newOpen) {
-        setTitle("");
-        setDescription("");
-        setStatus("backlog");
-        setPriority("medium");
+        setTitle('');
+        setDescription('');
+        setStatus('backlog');
+        setPriority('medium');
         setDueDate(undefined);
-        setPoints("");
+        setPoints('');
+        setAssigneeId('unassigned');
       }
     }
+  };
+
+  const getUserDisplayName = (user: { name: string | null; email: string }) => {
+    return user.name || user.email;
+  };
+
+  const getUserInitials = (user: { name: string | null; email: string }) => {
+    if (user.name) {
+      return user.name
+        .split(' ')
+        .map((n) => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2);
+    }
+    return user.email?.[0]?.toUpperCase() || '?';
   };
 
   return (
@@ -206,13 +235,13 @@ export function CreateTicketDialog({
                 <Button
                   variant="outline"
                   className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !dueDate && "text-muted-foreground"
+                    'w-full justify-start text-left font-normal',
+                    !dueDate && 'text-muted-foreground'
                   )}
                   disabled={isLoading}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dueDate ? format(dueDate, "PPP") : <span>Pick a date</span>}
+                  {dueDate ? format(dueDate, 'PPP') : <span>Pick a date</span>}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -220,7 +249,9 @@ export function CreateTicketDialog({
                   mode="single"
                   selected={dueDate}
                   onSelect={setDueDate}
-                  disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                  disabled={(date) =>
+                    date < new Date(new Date().setHours(0, 0, 0, 0))
+                  }
                   initialFocus
                 />
               </PopoverContent>
@@ -238,7 +269,7 @@ export function CreateTicketDialog({
               onChange={(e) => {
                 const value = e.target.value;
                 // Only allow positive integers
-                if (value === "" || /^\d+$/.test(value)) {
+                if (value === '' || /^\d+$/.test(value)) {
                   setPoints(value);
                 }
               }}
@@ -247,6 +278,38 @@ export function CreateTicketDialog({
             <p className="text-muted-foreground text-xs">
               Estimate effort using story points
             </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="assignee">Assignee (optional)</Label>
+            <Select
+              value={assigneeId}
+              onValueChange={setAssigneeId}
+              disabled={isLoading || isLoadingMembers}
+            >
+              <SelectTrigger id="assignee">
+                <SelectValue placeholder="Unassigned" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unassigned">Unassigned</SelectItem>
+                {members.map((member) => (
+                  <SelectItem key={member.id} value={member.id}>
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-5 w-5">
+                        <AvatarImage
+                          src={member.image || undefined}
+                          alt={getUserDisplayName(member)}
+                        />
+                        <AvatarFallback className="text-xs">
+                          {getUserInitials(member)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span>{getUserDisplayName(member)}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <DialogFooter>
@@ -265,7 +328,7 @@ export function CreateTicketDialog({
                   Creating...
                 </>
               ) : (
-                "Create Ticket"
+                'Create Ticket'
               )}
             </Button>
           </DialogFooter>
@@ -274,4 +337,3 @@ export function CreateTicketDialog({
     </Dialog>
   );
 }
-

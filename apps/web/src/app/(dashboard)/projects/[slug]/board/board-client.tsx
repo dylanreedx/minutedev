@@ -38,6 +38,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { useTickets, useReorderTicket, ticketKeys } from "@/hooks/use-tickets";
 import { useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { TicketStatus } from "@minute/db";
 
 // Order gap for calculating new order values
@@ -59,6 +60,12 @@ type Ticket = {
   points: number | null;
   order: number;
   status: TicketStatus;
+  assignee: {
+    id: string | null;
+    name: string | null;
+    email: string | null;
+    image: string | null;
+  } | null;
 };
 
 // Sortable ticket card component
@@ -102,6 +109,25 @@ function SortableTicketCard({
     );
   }
 
+  const getUserDisplayName = (assignee: { name: string | null; email: string | null }) => {
+    return assignee.name || assignee.email || "Unassigned";
+  };
+
+  const getUserInitials = (assignee: { name: string | null; email: string | null }) => {
+    if (assignee.name) {
+      return assignee.name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2);
+    }
+    if (assignee.email) {
+      return assignee.email[0].toUpperCase();
+    }
+    return "?";
+  };
+
   return (
     <div
       ref={setNodeRef}
@@ -136,6 +162,19 @@ function SortableTicketCard({
               </Badge>
             )}
           </div>
+          {ticket.assignee && (
+            <div className="flex items-center gap-1.5 mt-2">
+              <Avatar className="h-5 w-5">
+                <AvatarImage src={ticket.assignee.image || undefined} alt={getUserDisplayName(ticket.assignee)} />
+                <AvatarFallback className="text-xs">
+                  {getUserInitials(ticket.assignee)}
+                </AvatarFallback>
+              </Avatar>
+              <span className="text-xs text-muted-foreground truncate">
+                {getUserDisplayName(ticket.assignee)}
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </div>

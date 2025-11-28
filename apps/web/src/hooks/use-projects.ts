@@ -1,7 +1,6 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   createProject,
@@ -9,6 +8,7 @@ import {
   getProject,
   updateProject,
   deleteProject,
+  getProjectMembers,
   type CreateProjectInput,
   type UpdateProjectInput,
 } from "@/actions/projects";
@@ -18,9 +18,9 @@ import type { Project } from "@minute/db";
 export const projectKeys = {
   all: ["projects"] as const,
   lists: () => [...projectKeys.all, "list"] as const,
-  list: (filters?: string) => [...projectKeys.lists(), { filters }] as const,
   details: () => [...projectKeys.all, "detail"] as const,
   detail: (slug: string) => [...projectKeys.details(), slug] as const,
+  members: (projectId: string) => [...projectKeys.all, "members", projectId] as const,
 };
 
 // Queries
@@ -30,50 +30,66 @@ export function useProjects() {
     queryFn: async () => {
       const result = await getProjects();
       if (!result.success) {
-        throw new Error(result.error || "Failed to fetch projects");
+        const errorMessage = 'error' in result ? result.error : "Failed to fetch projects";
+        throw new Error(errorMessage);
       }
       return result.data;
     },
   });
 }
 
-export function useProject(slug: string) {
+export function useProject(slug: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: projectKeys.detail(slug),
     queryFn: async () => {
       const result = await getProject(slug);
       if (!result.success) {
-        throw new Error(result.error || "Failed to fetch project");
+        const errorMessage = 'error' in result ? result.error : "Failed to fetch project";
+        throw new Error(errorMessage);
+      }
+      if ('data' in result) {
+        return result.data;
+      }
+      throw new Error("Failed to fetch project");
+    },
+    enabled: options?.enabled !== undefined ? options.enabled : !!slug,
+  });
+}
+
+export function useProjectMembers(projectId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: projectKeys.members(projectId),
+    queryFn: async () => {
+      const result = await getProjectMembers(projectId);
+      if (!result.success) {
+        const errorMessage = 'error' in result ? result.error : "Failed to fetch project members";
+        throw new Error(errorMessage);
       }
       return result.data;
     },
-    enabled: !!slug,
+    enabled: options?.enabled !== undefined ? options.enabled : !!projectId,
   });
 }
 
 // Mutations
 export function useCreateProject() {
   const queryClient = useQueryClient();
-  const router = useRouter();
 
   return useMutation({
     mutationFn: async (input: CreateProjectInput) => {
       const result = await createProject(input);
       if (!result.success) {
-        throw new Error(result.error || "Failed to create project");
+        const errorMessage = 'error' in result ? result.error : "Failed to create project";
+        throw new Error(errorMessage);
       }
-      return result.data;
+      if ('data' in result) {
+        return result.data;
+      }
+      throw new Error("Failed to create project");
     },
-    onSuccess: (data) => {
-      // Invalidate and refetch projects list
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
       toast.success("Project created successfully!");
-      
-      // Navigate to the new project
-      if (data) {
-        router.push(`/projects/${data.slug}`);
-        router.refresh();
-      }
     },
     onError: (error: Error) => {
       toast.error(error.message || "Failed to create project");
@@ -88,16 +104,17 @@ export function useUpdateProject() {
     mutationFn: async (input: UpdateProjectInput) => {
       const result = await updateProject(input);
       if (!result.success) {
-        throw new Error(result.error || "Failed to update project");
+        const errorMessage = 'error' in result ? result.error : "Failed to update project";
+        throw new Error(errorMessage);
       }
-      return result.data;
+      if ('data' in result) {
+        return result.data;
+      }
+      throw new Error("Failed to update project");
     },
     onSuccess: (data) => {
-      // Invalidate both list and detail queries
       queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
-      if (data) {
-        queryClient.invalidateQueries({ queryKey: projectKeys.detail(data.slug) });
-      }
+      queryClient.invalidateQueries({ queryKey: projectKeys.detail(data.slug) });
       toast.success("Project updated successfully!");
     },
     onError: (error: Error) => {
@@ -108,29 +125,21 @@ export function useUpdateProject() {
 
 export function useDeleteProject() {
   const queryClient = useQueryClient();
-  const router = useRouter();
 
   return useMutation({
     mutationFn: async (projectId: string) => {
       const result = await deleteProject(projectId);
       if (!result.success) {
-        throw new Error(result.error || "Failed to delete project");
+        const errorMessage = 'error' in result ? result.error : "Failed to delete project";
+        throw new Error(errorMessage);
       }
-      return result;
     },
     onSuccess: () => {
-      // Invalidate projects list
       queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
       toast.success("Project deleted successfully!");
-      
-      // Navigate back to projects list
-      router.push("/projects");
-      router.refresh();
     },
     onError: (error: Error) => {
       toast.error(error.message || "Failed to delete project");
     },
   });
 }
-
-

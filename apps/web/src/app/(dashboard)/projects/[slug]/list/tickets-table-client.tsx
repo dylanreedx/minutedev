@@ -22,6 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import type { TicketStatus, TicketPriority } from "@minute/db";
 
@@ -56,7 +57,7 @@ function getPriorityBadgeVariant(priority: TicketPriority): string {
   }
 }
 
-type SortField = "title" | "status" | "priority" | "dueDate" | "createdAt" | null;
+type SortField = "title" | "status" | "priority" | "dueDate" | "createdAt" | "assignee" | null;
 type SortDirection = "asc" | "desc";
 
 export function TicketsTableClient({ slug, projectId, projectName }: { slug: string; projectId: string; projectName: string }) {
@@ -153,6 +154,14 @@ export function TicketsTableClient({ slug, projectId, projectName }: { slug: str
               ? b.createdAt
               : new Date(b.createdAt)
             : new Date(0);
+          break;
+        case "assignee":
+          aValue = a.assignee?.name || a.assignee?.email || "";
+          bValue = b.assignee?.name || b.assignee?.email || "";
+          // Handle null values (put them at the end)
+          if (aValue === "" && bValue === "") return 0;
+          if (aValue === "") return 1;
+          if (bValue === "") return -1;
           break;
         default:
           return 0;
@@ -288,75 +297,122 @@ export function TicketsTableClient({ slug, projectId, projectName }: { slug: str
                       <SortIcon field="createdAt" />
                     </button>
                   </TableHead>
+                  <TableHead>
+                    <button
+                      onClick={() => handleSort("assignee")}
+                      className="flex items-center hover:text-foreground transition-colors cursor-pointer"
+                    >
+                      Assignee
+                      <SortIcon field="assignee" />
+                    </button>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {sortedTickets.length === 0 ? (
                   // This case should be handled by the EmptyState above, but keeping as fallback
                   <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                       No tickets found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  sortedTickets.map((ticket) => (
-                    <TableRow
-                      key={ticket.id}
-                      onClick={() => {
-                        setSelectedTicketId(ticket.id);
-                        setIsEditDialogOpen(true);
-                      }}
-                      className="cursor-pointer hover:bg-muted/50"
-                    >
-                      <TableCell className="font-medium">{ticket.title}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "text-xs border",
-                            getStatusBadgeVariant(ticket.status as TicketStatus)
+                  sortedTickets.map((ticket) => {
+                    const getUserDisplayName = (assignee: { name: string | null; email: string | null } | null | undefined) => {
+                      if (!assignee) return "Unassigned";
+                      return assignee.name || assignee.email || "Unassigned";
+                    };
+
+                    const getUserInitials = (assignee: { name: string | null; email: string | null } | null | undefined) => {
+                      if (!assignee) return "?";
+                      if (assignee.name) {
+                        return assignee.name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                          .toUpperCase()
+                          .slice(0, 2);
+                      }
+                      if (assignee.email) {
+                        return assignee.email[0].toUpperCase();
+                      }
+                      return "?";
+                    };
+
+                    return (
+                      <TableRow
+                        key={ticket.id}
+                        onClick={() => {
+                          setSelectedTicketId(ticket.id);
+                          setIsEditDialogOpen(true);
+                        }}
+                        className="cursor-pointer hover:bg-muted/50"
+                      >
+                        <TableCell className="font-medium">{ticket.title}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-xs border",
+                              getStatusBadgeVariant(ticket.status as TicketStatus)
+                            )}
+                          >
+                            {ticket.status === "in_progress" ? "In Progress" : ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-xs border",
+                              getPriorityBadgeVariant(ticket.priority as TicketPriority)
+                            )}
+                          >
+                            {ticket.priority.charAt(0).toUpperCase() + ticket.priority.slice(1)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {ticket.dueDate ? (
+                            format(
+                              ticket.dueDate instanceof Date
+                                ? ticket.dueDate
+                                : new Date(ticket.dueDate),
+                              "MMM d, yyyy"
+                            )
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
                           )}
-                        >
-                          {ticket.status === "in_progress" ? "In Progress" : ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "text-xs border",
-                            getPriorityBadgeVariant(ticket.priority as TicketPriority)
+                        </TableCell>
+                        <TableCell>
+                          {ticket.createdAt ? (
+                            format(
+                              ticket.createdAt instanceof Date
+                                ? ticket.createdAt
+                                : new Date(ticket.createdAt),
+                              "MMM d, yyyy"
+                            )
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
                           )}
-                        >
-                          {ticket.priority.charAt(0).toUpperCase() + ticket.priority.slice(1)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {ticket.dueDate ? (
-                          format(
-                            ticket.dueDate instanceof Date
-                              ? ticket.dueDate
-                              : new Date(ticket.dueDate),
-                            "MMM d, yyyy"
-                          )
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {ticket.createdAt ? (
-                          format(
-                            ticket.createdAt instanceof Date
-                              ? ticket.createdAt
-                              : new Date(ticket.createdAt),
-                            "MMM d, yyyy"
-                          )
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
+                        </TableCell>
+                        <TableCell>
+                          {ticket.assignee ? (
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-6 w-6">
+                                <AvatarImage src={ticket.assignee.image || undefined} alt={getUserDisplayName(ticket.assignee)} />
+                                <AvatarFallback className="text-xs">
+                                  {getUserInitials(ticket.assignee)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="text-sm">{getUserDisplayName(ticket.assignee)}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">Unassigned</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>

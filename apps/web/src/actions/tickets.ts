@@ -7,6 +7,7 @@ import {
   db,
   tickets,
   projects,
+  users,
   eq,
   and,
   desc,
@@ -34,8 +35,16 @@ async function getCurrentUser() {
   return session.user;
 }
 
-// Verify user owns the project
-async function verifyProjectAccess(projectId: string, userId: string) {
+// Verify project permission
+async function verifyProjectPermission(
+  projectId: string,
+  permission: 'create' | 'read' | 'update' | 'delete' | 'assign' | 'comment'
+) {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) {
+    return { success: false, error: 'Unauthorized' };
+  }
+
   const [project] = await db
     .select()
     .from(projects)
@@ -46,8 +55,26 @@ async function verifyProjectAccess(projectId: string, userId: string) {
     return { success: false, error: 'Project not found' };
   }
 
-  if (project.ownerId !== userId) {
-    return { success: false, error: 'Unauthorized' };
+  // For backward compatibility: if no organizationId, check ownership
+  if (!project.organizationId) {
+    if (project.ownerId !== session.user.id) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    return { success: true, project };
+  }
+
+  // Check organization permission
+  const hasPermission = await auth.api.hasPermission({
+    headers: await headers(),
+    body: {
+      permissions: {
+        project: [permission],
+      },
+    },
+  });
+
+  if (!hasPermission) {
+    return { success: false, error: 'Insufficient permissions' };
   }
 
   return { success: true, project };
@@ -90,6 +117,16 @@ export type CreateTicketInput = z.infer<typeof createTicketSchema>;
 export type UpdateTicketInput = z.infer<typeof updateTicketSchema>;
 export type ReorderTicketInput = z.infer<typeof reorderTicketSchema>;
 
+// Type for ticket with assignee data
+export type TicketWithAssignee = Ticket & {
+  assignee: {
+    id: string | null;
+    name: string | null;
+    email: string | null;
+    image: string | null;
+  } | null;
+};
+
 // Get the next order value for a status in a project
 async function getNextOrder(
   projectId: string,
@@ -131,8 +168,8 @@ export async function createTicket(input: z.infer<typeof createTicketSchema>) {
     const user = await getCurrentUser();
     const validated = createTicketSchema.parse(input);
 
-    // Verify project access
-    const accessCheck = await verifyProjectAccess(validated.projectId, user.id);
+    // Verify project permission (create ticket requires read permission)
+    const accessCheck = await verifyProjectPermission(validated.projectId, 'read');
     if (!accessCheck.success) {
       return accessCheck;
     }
@@ -197,8 +234,8 @@ export async function getTickets(projectId: string) {
   try {
     const user = await getCurrentUser();
 
-    // Verify project access
-    const accessCheck = await verifyProjectAccess(projectId, user.id);
+    // Verify project permission (read access)
+    const accessCheck = await verifyProjectPermission(projectId, 'read');
     if (!accessCheck.success) {
       return {
         ...accessCheck,
@@ -207,14 +244,36 @@ export async function getTickets(projectId: string) {
           todo: [],
           in_progress: [],
           done: [],
-        } as Record<TicketStatus, Ticket[]>,
+        } as Record<TicketStatus, TicketWithAssignee[]>,
       };
     }
 
-    // Get all tickets for the project, ordered by status and order
+    // Get all tickets for the project with assignee data, ordered by status and order
     const projectTickets = await db
-      .select()
+      .select({
+        id: tickets.id,
+        title: tickets.title,
+        description: tickets.description,
+        status: tickets.status,
+        priority: tickets.priority,
+        order: tickets.order,
+        projectId: tickets.projectId,
+        creatorId: tickets.creatorId,
+        assigneeId: tickets.assigneeId,
+        dueDate: tickets.dueDate,
+        points: tickets.points,
+        metadata: tickets.metadata,
+        createdAt: tickets.createdAt,
+        updatedAt: tickets.updatedAt,
+        assignee: {
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          image: users.image,
+        },
+      })
       .from(tickets)
+      .leftJoin(users, eq(tickets.assigneeId, users.id))
       .where(eq(tickets.projectId, projectId))
       .orderBy(tickets.status, tickets.order);
 
@@ -226,7 +285,7 @@ export async function getTickets(projectId: string) {
       }
       acc[status].push(ticket);
       return acc;
-    }, {} as Record<TicketStatus, typeof projectTickets>);
+    }, {} as Record<TicketStatus, TicketWithAssignee[]>);
 
     return { success: true, data: grouped };
   } catch (error) {
@@ -239,7 +298,7 @@ export async function getTickets(projectId: string) {
         todo: [],
         in_progress: [],
         done: [],
-      } as Record<TicketStatus, Ticket[]>,
+      } as Record<TicketStatus, TicketWithAssignee[]>,
     };
   }
 }
@@ -262,8 +321,8 @@ export async function getTicket(ticketId: string) {
       };
     }
 
-    // Verify project access
-    const accessCheck = await verifyProjectAccess(ticket.projectId, user.id);
+    // Verify project permission (read access)
+    const accessCheck = await verifyProjectPermission(ticket.projectId, 'read');
     if (!accessCheck.success) {
       return accessCheck;
     }
@@ -297,8 +356,8 @@ export async function updateTicket(input: z.infer<typeof updateTicketSchema>) {
       };
     }
 
-    // Verify project access
-    const accessCheck = await verifyProjectAccess(existing.projectId, user.id);
+    // Verify project permission (update access)
+    const accessCheck = await verifyProjectPermission(existing.projectId, 'update');
     if (!accessCheck.success) {
       return accessCheck;
     }
@@ -404,8 +463,8 @@ export async function deleteTicket(ticketId: string) {
       };
     }
 
-    // Verify project access
-    const accessCheck = await verifyProjectAccess(existing.projectId, user.id);
+    // Verify project permission (delete access)
+    const accessCheck = await verifyProjectPermission(existing.projectId, 'delete');
     if (!accessCheck.success) {
       return accessCheck;
     }
@@ -437,8 +496,8 @@ export async function reorderTicket(
     const user = await getCurrentUser();
     const validated = reorderTicketSchema.parse(input);
 
-    // Verify project access
-    const accessCheck = await verifyProjectAccess(validated.projectId, user.id);
+    // Verify project permission (update access for reordering)
+    const accessCheck = await verifyProjectPermission(validated.projectId, 'update');
     if (!accessCheck.success) {
       return accessCheck;
     }
