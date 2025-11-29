@@ -13,17 +13,12 @@ export default async function AcceptInvitePage({
 }: AcceptInvitePageProps) {
   const { invitationId } = await params;
 
-  // Check if user is logged in
+  // Check if user is logged in (but don't redirect - allow viewing invitation)
   const session = await auth.api.getSession({
     headers: await headers(),
   });
 
-  if (!session) {
-    // Redirect to login with return URL
-    redirect(`/login?redirect=/accept-invite/${invitationId}`);
-  }
-
-  // Get invitation details
+  // Get invitation details (works even without session for link-based invites)
   try {
     const invitation = await auth.api.getInvitation({
       headers: await headers(),
@@ -76,7 +71,30 @@ export default async function AcceptInvitePage({
       );
     }
 
-    return <AcceptInviteClient invitationId={invitationId} invitation={invitation} />;
+    // Get organization name for display
+    let organizationName = "the team";
+    try {
+      const { getClient } = await import("@minute/db");
+      const client = getClient();
+      const orgResult = await client.execute({
+        sql: `SELECT name FROM organization WHERE id = ? LIMIT 1`,
+        args: [invitation.organizationId],
+      });
+      if (orgResult.rows?.[0]) {
+        organizationName = (orgResult.rows[0] as { name: string }).name;
+      }
+    } catch (error) {
+      console.error("Error fetching organization name:", error);
+    }
+
+    return (
+      <AcceptInviteClient
+        invitationId={invitationId}
+        invitation={invitation}
+        organizationName={organizationName}
+        isAuthenticated={!!session}
+      />
+    );
   } catch (error) {
     console.error("Error fetching invitation:", error);
     return (

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,8 @@ import { Loader2, Mail } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const inviteId = searchParams.get("invite");
   const [step, setStep] = useState<"signup" | "verify">("signup");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -91,7 +93,12 @@ export default function RegisterPage() {
       }
 
       toast.success("Email verified! Signing you in...");
-      router.push("/projects");
+      // Redirect to accept-invite page if coming from an invitation, otherwise go to projects
+      if (inviteId) {
+        router.push(`/accept-invite/${inviteId}`);
+      } else {
+        router.push("/projects");
+      }
       router.refresh();
     } catch {
       toast.error("Something went wrong. Please try again.");
@@ -103,9 +110,10 @@ export default function RegisterPage() {
   const handleGitHubSignIn = async () => {
     setIsGitHubLoading(true);
     try {
+      const callbackURL = inviteId ? `/accept-invite/${inviteId}` : "/projects";
       await authClient.signIn.social({
         provider: "github",
-        callbackURL: "/projects",
+        callbackURL,
       });
     } catch {
       toast.error("Failed to sign in with GitHub");

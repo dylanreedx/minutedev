@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, CheckCircle2, XCircle } from "lucide-react";
+import Link from "next/link";
+import { Loader2, CheckCircle2, XCircle, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -23,16 +24,53 @@ interface AcceptInviteClientProps {
     expiresAt?: Date | string;
     status?: string;
   };
+  organizationName: string;
+  isAuthenticated: boolean;
 }
 
 export function AcceptInviteClient({
   invitationId,
   invitation,
+  organizationName,
+  isAuthenticated,
 }: AcceptInviteClientProps) {
   const router = useRouter();
   const [isAccepting, setIsAccepting] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
   const [status, setStatus] = useState<"idle" | "accepted" | "rejected">("idle");
+  const [checkingAuth, setCheckingAuth] = useState(!isAuthenticated);
+
+  // Check if user became authenticated (e.g., after signup/login)
+  useEffect(() => {
+    if (!isAuthenticated && checkingAuth) {
+      const checkAuth = async () => {
+        try {
+          const session = await authClient.getSession();
+          if (session) {
+            setCheckingAuth(false);
+            // User just authenticated, try to accept invitation automatically
+            setIsAccepting(true);
+            try {
+              await authClient.organization.acceptInvitation({
+                invitationId,
+              });
+              setStatus("accepted");
+              setTimeout(() => {
+                router.push("/projects");
+              }, 2000);
+            } catch (error) {
+              console.error("Error accepting invitation:", error);
+              setIsAccepting(false);
+            }
+          }
+        } catch (error) {
+          // User is still not authenticated
+          setCheckingAuth(false);
+        }
+      };
+      checkAuth();
+    }
+  }, [isAuthenticated, checkingAuth, invitationId, router]);
 
   const handleAccept = async () => {
     setIsAccepting(true);
@@ -118,21 +156,89 @@ export function AcceptInviteClient({
     );
   }
 
+  // Show signup/login prompt for non-authenticated users
+  if (!isAuthenticated && !checkingAuth) {
+    const isLinkBasedInvite = invitation.email.includes("@team.invite");
+    
+    return (
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
+              <Users className="h-6 w-6 text-blue-600" />
+            </div>
+            <CardTitle>Joining {organizationName}</CardTitle>
+            <CardDescription>
+              {isLinkBasedInvite
+                ? "Create an account to join this team."
+                : `You've been invited to join ${organizationName} as a ${invitation.role || "member"}.`}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {!isLinkBasedInvite && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Invited Email:</p>
+                <p className="text-sm text-muted-foreground">{invitation.email}</p>
+              </div>
+            )}
+
+            {invitation.role && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Role:</p>
+                <p className="text-sm text-muted-foreground capitalize">
+                  {invitation.role}
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-3 pt-4">
+              <Button
+                asChild
+                className="w-full"
+              >
+                <Link href={`/register?invite=${invitationId}`}>
+                  Create Account
+                </Link>
+              </Button>
+              <Button
+                asChild
+                variant="outline"
+                className="w-full"
+              >
+                <Link href={`/login?redirect=/accept-invite/${invitationId}`}>
+                  Sign In
+                </Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (checkingAuth) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
+            <CardTitle className="mt-4">Checking...</CardTitle>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
             <CardTitle>Team Invitation</CardTitle>
             <CardDescription>
-              You've been invited to join a team.
+              You've been invited to join {organizationName}.
             </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Email:</p>
-            <p className="text-sm text-muted-foreground">{invitation.email}</p>
-          </div>
-
           {invitation.role && (
             <div className="space-y-2">
               <p className="text-sm font-medium">Role:</p>
