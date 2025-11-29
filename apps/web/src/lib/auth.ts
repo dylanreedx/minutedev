@@ -2,7 +2,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import { emailOTP, organization } from "better-auth/plugins";
-import { db, users, sessions, accounts, verifications } from "@minute/db";
+import { db, users, sessions, accounts, verifications, organization as organizationTable, member as memberTable, invitation, team, teamMember } from "@minute/db";
 import { Resend } from "resend";
 import { ac, owner, admin, member } from "./permissions";
 
@@ -28,6 +28,11 @@ export const auth = betterAuth({
       session: sessions,
       account: accounts,
       verification: verifications,
+      organization: organizationTable,
+      member: memberTable,
+      invitation: invitation,
+      team: team,
+      teamMember: teamMember,
     },
   }),
   emailAndPassword: {

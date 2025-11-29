@@ -26,6 +26,9 @@ export function getDb() {
   return dbInstance;
 }
 
+// Export getClient for direct database access
+export { getClient };
+
 // For backwards compatibility - lazy getter
 export const db = new Proxy({} as ReturnType<typeof drizzle<typeof schema>>, {
   get(_, prop) {
