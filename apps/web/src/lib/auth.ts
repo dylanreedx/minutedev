@@ -47,6 +47,18 @@ export const auth = betterAuth({
       teamMember: teamMember,
     },
   }),
+  trustedOrigins: [
+    'http://localhost:3000',
+    'https://minutedev-web.vercel.app',
+    // Support wildcard for Vercel preview deployments
+    'https://*.vercel.app',
+    // Add any other production/staging URLs from environment variable
+    ...(process.env.BETTER_AUTH_TRUSTED_ORIGINS
+      ? process.env.BETTER_AUTH_TRUSTED_ORIGINS.split(',').map((origin) =>
+          origin.trim()
+        )
+      : []),
+  ],
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true, // Users must verify email before signing in
