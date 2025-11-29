@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Copy, Check } from "lucide-react";
+import { Loader2, Copy, Check, Mail, Link2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useInviteTeamMember } from "@/hooks/use-teams";
+import { useInviteTeamMember, useGenerateTeamInviteLink } from "@/hooks/use-teams";
 
 interface InviteTeamMemberDialogProps {
   open: boolean;
@@ -33,15 +33,17 @@ export function InviteTeamMemberDialog({
   onOpenChange,
   teamId,
 }: InviteTeamMemberDialogProps) {
+  const [mode, setMode] = useState<"email" | "link">("email");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"member" | "admin">("member");
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const inviteMember = useInviteTeamMember();
+  const generateLink = useGenerateTeamInviteLink();
 
-  const isLoading = inviteMember.isPending;
+  const isLoading = inviteMember.isPending || generateLink.isPending;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!email.trim()) {
@@ -68,6 +70,23 @@ export function InviteTeamMemberDialog({
     }
   };
 
+  const handleGenerateLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    try {
+      const result = await generateLink.mutateAsync({
+        teamId,
+        role,
+      });
+
+      if (result?.inviteLink) {
+        setInviteLink(result.inviteLink);
+      }
+    } catch (error) {
+      // Error is handled by the hook (toast)
+    }
+  };
+
   const handleCopyLink = async () => {
     if (inviteLink) {
       await navigator.clipboard.writeText(inviteLink);
@@ -80,6 +99,7 @@ export function InviteTeamMemberDialog({
     onOpenChange(false);
     // Reset state after a short delay to allow dialog to close
     setTimeout(() => {
+      setMode("email");
       setEmail("");
       setRole("member");
       setInviteLink(null);
@@ -95,7 +115,7 @@ export function InviteTeamMemberDialog({
           <DialogDescription>
             {inviteLink
               ? "Share this link with the person you want to invite."
-              : "Send an invitation to join this team. The invitee will receive an email with a link to accept."}
+              : "Choose how you'd like to invite someone to join your team."}
           </DialogDescription>
         </DialogHeader>
 
@@ -123,69 +143,139 @@ export function InviteTeamMemberDialog({
                 </Button>
               </div>
               <p className="text-sm text-muted-foreground">
-                Copy this link and share it with the person you want to invite.
+                Copy this link and share it with the person you want to invite. They'll be able to create an account and join your team.
               </p>
             </div>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="colleague@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={isLoading}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="role">Role</Label>
-              <Select
-                value={role}
-                onValueChange={(value: "member" | "admin") => setRole(value)}
-                disabled={isLoading}
-              >
-                <SelectTrigger id="role">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="member">Member</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-sm text-muted-foreground">
-                Members can view and edit projects. Admins can also manage team settings and members.
-              </p>
-            </div>
-
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleClose}
-                disabled={isLoading}
-              >
-                Cancel
+              <Button onClick={handleClose} variant="outline">
+                Done
               </Button>
-              <Button type="submit" disabled={isLoading || !email.trim()}>
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Send Invitation
+              <Button onClick={() => {
+                setInviteLink(null);
+                setMode("email");
+              }}>
+                Invite Another
               </Button>
             </DialogFooter>
-          </form>
-        )}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Mode Toggle */}
+            <div className="flex gap-2 rounded-lg border p-1">
+              <Button
+                type="button"
+                variant={mode === "email" ? "default" : "ghost"}
+                className="flex-1"
+                onClick={() => setMode("email")}
+                disabled={isLoading}
+              >
+                <Mail className="mr-2 h-4 w-4" />
+                Send Email
+              </Button>
+              <Button
+                type="button"
+                variant={mode === "link" ? "default" : "ghost"}
+                className="flex-1"
+                onClick={() => setMode("link")}
+                disabled={isLoading}
+              >
+                <Link2 className="mr-2 h-4 w-4" />
+                Generate Link
+              </Button>
+            </div>
 
-        {inviteLink && (
-          <DialogFooter>
-            <Button onClick={handleClose} variant="outline">
-              Done
-            </Button>
-            <Button onClick={handleClose}>Invite Another</Button>
-          </DialogFooter>
+            {mode === "email" ? (
+              <form onSubmit={handleEmailSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="colleague@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={isLoading}
+                    required
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    The invitee will receive an email with a link to accept the invitation.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="role-email">Role</Label>
+                  <Select
+                    value={role}
+                    onValueChange={(value: "member" | "admin") => setRole(value)}
+                    disabled={isLoading}
+                  >
+                    <SelectTrigger id="role-email">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="member">Member</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-muted-foreground">
+                    Members can view and edit projects. Admins can also manage team settings and members.
+                  </p>
+                </div>
+
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleClose}
+                    disabled={isLoading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={isLoading || !email.trim()}>
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Send Invitation
+                  </Button>
+                </DialogFooter>
+              </form>
+            ) : (
+              <form onSubmit={handleGenerateLink} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="role-link">Role</Label>
+                  <Select
+                    value={role}
+                    onValueChange={(value: "member" | "admin") => setRole(value)}
+                    disabled={isLoading}
+                  >
+                    <SelectTrigger id="role-link">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="member">Member</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-muted-foreground">
+                    Generate a shareable link. Anyone with the link can create an account and join your team as a {role}.
+                  </p>
+                </div>
+
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleClose}
+                    disabled={isLoading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={isLoading}>
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Generate Link
+                  </Button>
+                </DialogFooter>
+              </form>
+            )}
+          </div>
         )}
       </DialogContent>
     </Dialog>

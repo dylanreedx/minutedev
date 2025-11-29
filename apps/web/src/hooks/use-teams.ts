@@ -9,6 +9,7 @@ import {
   updateTeam,
   deleteTeam,
   inviteTeamMember,
+  generateTeamInviteLink,
   listTeamInvitations,
   getTeamMembers,
   updateTeamMemberRole,
@@ -18,6 +19,7 @@ import {
   type CreateTeamInput,
   type UpdateTeamInput,
   type InviteTeamMemberInput,
+  type GenerateInviteLinkInput,
   type UpdateTeamMemberRoleInput,
   type RemoveTeamMemberInput,
   type ResendInvitationInput,
@@ -189,6 +191,31 @@ export function useInviteTeamMember() {
     },
     onError: (error: Error) => {
       toast.error(error.message || "Failed to invite team member");
+    },
+  });
+}
+
+export function useGenerateTeamInviteLink() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: GenerateInviteLinkInput) => {
+      const result = await generateTeamInviteLink(input);
+      if (!result.success) {
+        const errorMessage = 'error' in result ? result.error : "Failed to generate invite link";
+        throw new Error(errorMessage);
+      }
+      if ('data' in result) {
+        return result.data;
+      }
+      throw new Error("Failed to generate invite link");
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: [...teamKeys.detail(variables.teamId), "invitations"] });
+      toast.success("Invite link generated successfully!");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to generate invite link");
     },
   });
 }
