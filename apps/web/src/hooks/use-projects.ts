@@ -5,12 +5,18 @@ import { toast } from "sonner";
 import {
   createProject,
   getProjects,
+  getProjectsByTeam,
   getProject,
   updateProject,
   deleteProject,
   getProjectMembers,
+  inviteProjectMember,
+  listProjectInvitations,
+  cancelProjectInvitation,
+  getProjectInvitation,
   type CreateProjectInput,
   type UpdateProjectInput,
+  type InviteMemberInput,
 } from "@/actions/projects";
 import type { Project } from "@minute/db";
 
@@ -18,23 +24,41 @@ import type { Project } from "@minute/db";
 export const projectKeys = {
   all: ["projects"] as const,
   lists: () => [...projectKeys.all, "list"] as const,
+  list: (teamId?: string) => [...projectKeys.lists(), teamId || "all"] as const,
   details: () => [...projectKeys.all, "detail"] as const,
   detail: (slug: string) => [...projectKeys.details(), slug] as const,
   members: (projectId: string) => [...projectKeys.all, "members", projectId] as const,
+  invitations: (projectId: string) => [...projectKeys.all, "invitations", projectId] as const,
+  invitation: (invitationId: string) => [...projectKeys.all, "invitation", invitationId] as const,
 };
 
 // Queries
-export function useProjects() {
+export function useProjects(teamId?: string) {
   return useQuery({
-    queryKey: projectKeys.lists(),
+    queryKey: projectKeys.list(teamId),
     queryFn: async () => {
-      const result = await getProjects();
+      const result = await getProjects(teamId);
       if (!result.success) {
         const errorMessage = 'error' in result ? result.error : "Failed to fetch projects";
         throw new Error(errorMessage);
       }
       return result.data;
     },
+  });
+}
+
+export function useProjectsByTeam(teamId: string) {
+  return useQuery({
+    queryKey: projectKeys.list(teamId),
+    queryFn: async () => {
+      const result = await getProjectsByTeam(teamId);
+      if (!result.success) {
+        const errorMessage = 'error' in result ? result.error : "Failed to fetch projects";
+        throw new Error(errorMessage);
+      }
+      return result.data;
+    },
+    enabled: !!teamId,
   });
 }
 
@@ -140,6 +164,88 @@ export function useDeleteProject() {
     },
     onError: (error: Error) => {
       toast.error(error.message || "Failed to delete project");
+    },
+  });
+}
+
+// Invite queries
+export function useProjectInvitations(projectId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: projectKeys.invitations(projectId),
+    queryFn: async () => {
+      const result = await listProjectInvitations(projectId);
+      if (!result.success) {
+        const errorMessage = 'error' in result ? result.error : "Failed to fetch invitations";
+        throw new Error(errorMessage);
+      }
+      return result.data;
+    },
+    enabled: options?.enabled !== undefined ? options.enabled : !!projectId,
+  });
+}
+
+export function useProjectInvitation(invitationId: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: projectKeys.invitation(invitationId),
+    queryFn: async () => {
+      const result = await getProjectInvitation(invitationId);
+      if (!result.success) {
+        const errorMessage = 'error' in result ? result.error : "Failed to fetch invitation";
+        throw new Error(errorMessage);
+      }
+      if ('data' in result) {
+        return result.data;
+      }
+      throw new Error("Failed to fetch invitation");
+    },
+    enabled: options?.enabled !== undefined ? options.enabled : !!invitationId,
+  });
+}
+
+// Invite mutations
+export function useInviteProjectMember() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: InviteMemberInput) => {
+      const result = await inviteProjectMember(input);
+      if (!result.success) {
+        const errorMessage = 'error' in result ? result.error : "Failed to invite member";
+        throw new Error(errorMessage);
+      }
+      if ('data' in result) {
+        return result.data;
+      }
+      throw new Error("Failed to invite member");
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: projectKeys.invitations(variables.projectId) });
+      queryClient.invalidateQueries({ queryKey: projectKeys.members(variables.projectId) });
+      toast.success("Invitation sent successfully!");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to invite member");
+    },
+  });
+}
+
+export function useCancelProjectInvitation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ invitationId, projectId }: { invitationId: string; projectId: string }) => {
+      const result = await cancelProjectInvitation(invitationId);
+      if (!result.success) {
+        const errorMessage = 'error' in result ? result.error : "Failed to cancel invitation";
+        throw new Error(errorMessage);
+      }
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: projectKeys.invitations(variables.projectId) });
+      toast.success("Invitation cancelled successfully!");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to cancel invitation");
     },
   });
 }
