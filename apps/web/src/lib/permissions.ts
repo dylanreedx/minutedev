@@ -1,21 +1,34 @@
 import { createAccessControl } from "better-auth/plugins/access";
+import { defaultStatements, ownerAc, adminAc, memberAc } from "better-auth/plugins/organization/access";
 
 const statement = {
+  ...defaultStatements,
   project: ["create", "read", "update", "delete", "assign", "comment"],
+  // Merge our custom organization permissions with defaults
+  organization: [...(defaultStatements.organization || []), "invite", "remove", "read"] as const,
 } as const;
 
 export const ac = createAccessControl(statement);
 
 export const owner = ac.newRole({
   project: ["create", "read", "update", "delete", "assign", "comment"],
+  // Merge default owner permissions with our custom organization permissions
+  ...ownerAc.statements,
+  organization: ["invite", "remove", "update", "read"],
 });
 
 export const admin = ac.newRole({
   project: ["create", "read", "update", "assign", "comment"],
+  // Merge default admin permissions with our custom organization permissions
+  ...adminAc.statements,
+  organization: ["invite", "remove", "update", "read"],
 });
 
 export const member = ac.newRole({
   project: ["read", "assign", "comment"],
+  // Merge default member permissions with our custom organization permissions
+  ...memberAc.statements,
+  organization: ["read"],
 });
 
 // Team permission helpers
