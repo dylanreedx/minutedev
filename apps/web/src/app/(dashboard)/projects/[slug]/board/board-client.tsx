@@ -34,6 +34,7 @@ import { Badge } from "@/components/ui/badge";
 import { CreateTicketButton } from "@/components/tickets/create-ticket-button";
 import { EditTicketSheet } from "@/components/tickets/edit-ticket-sheet";
 import { TicketFilters } from "@/components/tickets/ticket-filters";
+import { InviteProjectButton } from "@/components/projects/invite-project-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useTickets, useReorderTicket, ticketKeys } from "@/hooks/use-tickets";
 import { useQueryClient } from "@tanstack/react-query";
@@ -594,6 +595,7 @@ export function BoardPageClient({
             List View
           </Button>
         </Link>
+        <InviteProjectButton projectId={projectId} />
         <CreateTicketButton projectId={projectId} />
       </Header>
 

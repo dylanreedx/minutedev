@@ -17,9 +17,14 @@ import { Button } from '@/components/ui/button';
 import { CreateProjectButton } from './create-project-button';
 import { EditProjectSheet } from '@/components/projects';
 import { useProjects } from '@/hooks/use-projects';
+import { TeamSelector } from '@/components/teams/team-selector';
+import { useTeams } from '@/hooks/use-teams';
+import { Badge } from '@/components/ui/badge';
 
 export default function ProjectsPage() {
-  const { data: projects = [], isLoading, error } = useProjects();
+  const [selectedTeamId, setSelectedTeamId] = useState<string | undefined>(undefined);
+  const { data: projects = [], isLoading, error } = useProjects(selectedTeamId);
+  const { data: teams = [] } = useTeams();
   const [editSheetOpen, setEditSheetOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<{
     slug: string;
@@ -32,13 +37,40 @@ export default function ProjectsPage() {
     setEditSheetOpen(true);
   };
 
+  const handleTeamChange = (teamId: string) => {
+    setSelectedTeamId(teamId === 'all' ? undefined : teamId);
+  };
+
   return (
     <>
       <Header title="Projects">
         <CreateProjectButton />
       </Header>
 
-      <div className="p-6">
+      <div className="p-6 space-y-4">
+        {/* Team Filter */}
+        {teams.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Filter by team:</span>
+            <div className="w-64">
+              <TeamSelector
+                value={selectedTeamId || 'all'}
+                onValueChange={handleTeamChange}
+                placeholder="All teams"
+              />
+            </div>
+            {selectedTeamId && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedTeamId(undefined)}
+              >
+                Clear
+              </Button>
+            )}
+          </div>
+        )}
+
         {isLoading ? (
           <ProjectsGridSkeleton />
         ) : error ? (
@@ -47,7 +79,11 @@ export default function ProjectsPage() {
           <EmptyState
             icon={ClipboardList}
             title="No projects yet"
-            description="Create your first project to get started tracking your work."
+            description={
+              selectedTeamId
+                ? "No projects found in this team. Create your first project to get started."
+                : "Create your first project to get started tracking your work."
+            }
             action={<CreateProjectButton />}
           />
         ) : (
@@ -107,6 +143,7 @@ function ProjectsGrid({
     name: string;
     description: string | null;
     slug: string;
+    teamName?: string | null;
     ticketCount?: number;
   }>;
   onEdit: (e: React.MouseEvent, project: { slug: string }) => void;
@@ -128,7 +165,14 @@ function ProjectsGrid({
           </Button>
           <Link href={`/projects/${project.slug}`} className="flex-1">
             <CardHeader>
-              <CardTitle>{project.name}</CardTitle>
+              <div className="flex items-start justify-between gap-2">
+                <CardTitle className="flex-1">{project.name}</CardTitle>
+                {project.teamName && (
+                  <Badge variant="secondary" className="text-xs">
+                    {project.teamName}
+                  </Badge>
+                )}
+              </div>
               {project.description && (
                 <CardDescription className="line-clamp-2">
                   {project.description}
