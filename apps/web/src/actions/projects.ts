@@ -661,9 +661,8 @@ export async function inviteProjectMember(
       }
     }
 
-    // Invite user to team using Better Auth
+    // Invite user to team using Better Auth handler
     try {
-      // Call Better Auth's organization invite endpoint via the handler
       const requestHeaders = await headers();
       const request = new Request(
         `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/auth/organization/invite-member`,
@@ -683,19 +682,49 @@ export async function inviteProjectMember(
       );
 
       const response = await auth.handler(request);
-      const invitation = await response.json();
-
-      if (!response.ok || !invitation || invitation.error) {
+      
+      // Handle response - read as text first, then try to parse as JSON
+      const responseText = await response.text();
+      
+      // Parse response regardless of status code
+      let invitation;
+      try {
+        invitation = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Failed to parse JSON response:', responseText);
+        if (!response.ok) {
+          return {
+            success: false,
+            error: 'Failed to create invitation: Invalid response from server',
+          };
+        }
+        // If response is ok but can't parse, try to extract error from text
         return {
           success: false,
-          error: invitation?.error || 'Failed to create invitation',
+          error: responseText || 'Failed to create invitation',
         };
       }
 
-      if (!invitation) {
+      // Check if response indicates an error
+      if (!response.ok || invitation?.error || (!invitation?.id && invitation?.message)) {
+        const errorMessage = invitation?.error || invitation?.message || 'Failed to create invitation';
+        console.error('Better Auth invitation error:', {
+          status: response.status,
+          statusText: response.statusText,
+          response: invitation,
+          rawResponse: responseText,
+        });
         return {
           success: false,
-          error: 'Failed to create invitation',
+          error: errorMessage,
+        };
+      }
+
+      if (!invitation || !invitation.id) {
+        console.error('Invalid invitation response:', invitation);
+        return {
+          success: false,
+          error: 'Failed to create invitation: Invalid response format',
         };
       }
 
@@ -850,10 +879,13 @@ export async function listProjectInvitations(projectId: string) {
 
     // List team invitations
     try {
-      // Note: listInvitations API doesn't accept body parameter
-      // It uses query params or organization context from session
+      // Note: listInvitations API requires organizationId as query parameter
+      // when there's no active organization in the session
       const invitations = await auth.api.listInvitations({
         headers: await headers(),
+        query: {
+          organizationId: project.organizationId,
+        },
       });
 
       if (!invitations || !Array.isArray(invitations)) {

@@ -29,6 +29,22 @@ export const member = sqliteTable("member", {
     .default(sql`(unixepoch())`),
 });
 
+// Better Auth team table (when teams feature is enabled)
+// Defined before invitation to allow forward reference
+export const team = sqliteTable("team", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  organizationId: text("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+});
+
 // Better Auth invitation table (for organization invitations)
 export const invitation = sqliteTable("invitation", {
   id: text("id").primaryKey(),
@@ -42,21 +58,12 @@ export const invitation = sqliteTable("invitation", {
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),
-});
-
-// Better Auth team table (when teams feature is enabled)
-export const team = sqliteTable("team", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  organizationId: text("organization_id")
+  // teamId is required when teams feature is enabled (optional field)
+  teamId: text("team_id").references(() => team.id, { onDelete: "cascade" }),
+  // inviterId tracks which user created the invitation
+  inviterId: text("inviter_id")
     .notNull()
-    .references(() => organization.id, { onDelete: "cascade" }),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .default(sql`(unixepoch())`),
-  updatedAt: integer("updated_at", { mode: "timestamp" })
-    .notNull()
-    .default(sql`(unixepoch())`),
+    .references(() => users.id, { onDelete: "cascade" }),
 });
 
 // Better Auth teamMember table (when teams feature is enabled)

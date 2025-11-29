@@ -492,6 +492,180 @@ const inviteTeamMemberSchema = z.object({
 
 export type InviteTeamMemberInput = z.infer<typeof inviteTeamMemberSchema>;
 
+// Generate invite link validation schema
+const generateInviteLinkSchema = z.object({
+  teamId: z.string(),
+  role: z.enum(['member', 'admin']).default('member'),
+});
+
+export type GenerateInviteLinkInput = z.infer<typeof generateInviteLinkSchema>;
+
+/**
+ * Generate an invite link without requiring an email upfront
+ * Creates an invitation with a placeholder email that can be claimed by anyone with the link
+ */
+export async function generateTeamInviteLink(
+  input: z.infer<typeof generateInviteLinkSchema>
+) {
+  try {
+    await getCurrentUser(); // Verify user is authenticated
+    const validated = generateInviteLinkSchema.parse(input);
+
+    // Verify team exists and user has access
+    const teamCheck = await getTeam(validated.teamId);
+    if (!teamCheck.success) {
+      return {
+        success: false,
+        error: 'Team not found or you do not have access',
+      };
+    }
+
+    // Get current user to check their role
+    const user = await getCurrentUser();
+    
+    // Get user's role in the organization
+    const client = getClient();
+    const memberResult = await client.execute({
+      sql: `SELECT role FROM member WHERE user_id = ? AND organization_id = ? LIMIT 1`,
+      args: [user.id, validated.teamId],
+    });
+    
+    const memberRow = memberResult.rows?.[0] as { role?: string } | undefined;
+    const userRole = memberRow?.role || 'unknown';
+
+    // Check if user has permission to invite members
+    const hasPermission = await auth.api.hasPermission({
+      headers: await headers(),
+      body: {
+        organizationId: validated.teamId,
+        permissions: {
+          organization: ['invite'],
+        },
+      },
+    });
+
+    if (!hasPermission) {
+      return {
+        success: false,
+        error: `You do not have permission to invite members to this organization. Your role: ${userRole}. Only owners and admins can invite members.`,
+      };
+    }
+
+    // Generate a placeholder email for link-based invites
+    // Format: invite-{timestamp}-{random}@team.invite
+    // This allows us to identify link-based invites later
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(2, 9);
+    const placeholderEmail = `invite-${timestamp}-${random}@team.invite`;
+
+    // Create invitation using Better Auth handler
+    try {
+      const requestHeaders = await headers();
+      const request = new Request(
+        `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/auth/organization/invite-member`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...Object.fromEntries(requestHeaders.entries()),
+          },
+          body: JSON.stringify({
+            email: placeholderEmail,
+            role: validated.role,
+            organizationId: validated.teamId,
+            resend: false, // Don't resend for link-based invites
+          }),
+        }
+      );
+
+      const response = await auth.handler(request);
+      
+      // Handle response - read as text first, then try to parse as JSON
+      const responseText = await response.text();
+      
+      // Parse response regardless of status code
+      let invitation;
+      try {
+        invitation = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Failed to parse JSON response:', responseText);
+        if (!response.ok) {
+          return {
+            success: false,
+            error: 'Failed to create invitation: Invalid response from server',
+          };
+        }
+        return {
+          success: false,
+          error: responseText || 'Failed to create invitation',
+        };
+      }
+
+      // Check if response indicates an error
+      if (!response.ok || invitation?.error || (!invitation?.id && invitation?.message)) {
+        const errorMessage = invitation?.error || invitation?.message || 'Failed to create invitation';
+        return {
+          success: false,
+          error: errorMessage,
+        };
+      }
+
+      if (!invitation || !invitation.id) {
+        return {
+          success: false,
+          error: 'Failed to create invitation: Invalid response format',
+        };
+      }
+
+      // Generate invite link
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const inviteLink = `${baseUrl}/accept-invite/${invitation.id}`;
+
+      // Revalidate team detail page
+      revalidatePath(`/teams/${validated.teamId}`);
+
+      // Log invitation created activity
+      await logTeamActivity(validated.teamId, 'invitation_link_generated', {
+        role: validated.role,
+        invitationId: invitation.id,
+      });
+
+      return {
+        success: true,
+        data: {
+          invitation,
+          inviteLink,
+        },
+      };
+    } catch (error) {
+      console.error('Error creating invitation link:', error);
+      return {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to create invitation link',
+      };
+    }
+  } catch (error) {
+    console.error('Error generating invite link:', error);
+    if (error instanceof z.ZodError) {
+      return {
+        success: false,
+        error: 'Validation error',
+        details: error.issues,
+      };
+    }
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Failed to generate invite link',
+    };
+  }
+}
+
 /**
  * Invite a user to a team by email
  */
@@ -511,7 +685,58 @@ export async function inviteTeamMember(
       };
     }
 
-    // Invite user to team using Better Auth
+    // Get current user to check their role
+    const user = await getCurrentUser();
+    
+    // Get user's role in the organization
+    const client = getClient();
+    const memberResult = await client.execute({
+      sql: `SELECT role FROM member WHERE user_id = ? AND organization_id = ? LIMIT 1`,
+      args: [user.id, validated.teamId],
+    });
+    
+    const memberRow = memberResult.rows?.[0] as { role?: string } | undefined;
+    const userRole = memberRow?.role || 'unknown';
+    
+    console.log('User role check:', {
+      userId: user.id,
+      teamId: validated.teamId,
+      userRole,
+      expectedRoles: ['owner', 'admin'],
+    });
+
+    // Check if user has permission to invite members
+    const hasPermission = await auth.api.hasPermission({
+      headers: await headers(),
+      body: {
+        organizationId: validated.teamId,
+        permissions: {
+          organization: ['invite'],
+        },
+      },
+    });
+
+    console.log('Permission check result:', {
+      hasPermission,
+      organizationId: validated.teamId,
+      userId: user.id,
+      userRole,
+    });
+
+    if (!hasPermission) {
+      console.error('Permission check failed for organization.invite:', {
+        teamId: validated.teamId,
+        userId: user.id,
+        userRole,
+        hasPermission,
+      });
+      return {
+        success: false,
+        error: `You do not have permission to invite members to this organization. Your role: ${userRole}. Only owners and admins can invite members.`,
+      };
+    }
+
+    // Invite user to team using Better Auth handler
     try {
       const requestHeaders = await headers();
       const request = new Request(
@@ -532,19 +757,49 @@ export async function inviteTeamMember(
       );
 
       const response = await auth.handler(request);
-      const invitation = await response.json();
-
-      if (!response.ok || !invitation || invitation.error) {
+      
+      // Handle response - read as text first, then try to parse as JSON
+      const responseText = await response.text();
+      
+      // Parse response regardless of status code
+      let invitation;
+      try {
+        invitation = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Failed to parse JSON response:', responseText);
+        if (!response.ok) {
+          return {
+            success: false,
+            error: 'Failed to create invitation: Invalid response from server',
+          };
+        }
+        // If response is ok but can't parse, try to extract error from text
         return {
           success: false,
-          error: invitation?.error || 'Failed to create invitation',
+          error: responseText || 'Failed to create invitation',
         };
       }
 
-      if (!invitation) {
+      // Check if response indicates an error
+      if (!response.ok || invitation?.error || (!invitation?.id && invitation?.message)) {
+        const errorMessage = invitation?.error || invitation?.message || 'Failed to create invitation';
+        console.error('Better Auth invitation error:', {
+          status: response.status,
+          statusText: response.statusText,
+          response: invitation,
+          rawResponse: responseText,
+        });
         return {
           success: false,
-          error: 'Failed to create invitation',
+          error: errorMessage,
+        };
+      }
+
+      if (!invitation || !invitation.id) {
+        console.error('Invalid invitation response:', invitation);
+        return {
+          success: false,
+          error: 'Failed to create invitation: Invalid response format',
         };
       }
 
@@ -617,10 +872,13 @@ export async function listTeamInvitations(teamId: string) {
 
     // List team invitations
     try {
-      // Note: listInvitations API doesn't accept body parameter
-      // It uses query params or organization context from session
+      // Note: listInvitations API requires organizationId as query parameter
+      // when there's no active organization in the session
       const invitations = await auth.api.listInvitations({
         headers: await headers(),
+        query: {
+          organizationId: teamId,
+        },
       });
 
       if (!invitations || !Array.isArray(invitations)) {
@@ -1109,7 +1367,7 @@ export async function resendTeamInvitation(
       };
     }
 
-    // Resend invitation using Better Auth API (using invite-member with resend: true)
+    // Resend invitation using Better Auth handler (using invite-member with resend: true)
     try {
       const requestHeaders = await headers();
       const request = new Request(
@@ -1130,12 +1388,40 @@ export async function resendTeamInvitation(
       );
 
       const response = await auth.handler(request);
-      const invitation = await response.json();
-
-      if (!response.ok || !invitation || invitation.error) {
+      
+      // Handle response - read as text first, then try to parse as JSON
+      const responseText = await response.text();
+      
+      // Parse response regardless of status code
+      let invitation;
+      try {
+        invitation = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Failed to parse JSON response:', responseText);
+        if (!response.ok) {
+          return {
+            success: false,
+            error: 'Failed to resend invitation: Invalid response from server',
+          };
+        }
         return {
           success: false,
-          error: invitation?.error || 'Failed to resend invitation',
+          error: responseText || 'Failed to resend invitation',
+        };
+      }
+
+      // Check if response indicates an error
+      if (!response.ok || invitation?.error || (!invitation?.id && invitation?.message)) {
+        const errorMessage = invitation?.error || invitation?.message || 'Failed to resend invitation';
+        console.error('Better Auth resend invitation error:', {
+          status: response.status,
+          statusText: response.statusText,
+          response: invitation,
+          rawResponse: responseText,
+        });
+        return {
+          success: false,
+          error: errorMessage,
         };
       }
 
