@@ -3,6 +3,7 @@ import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
 import { users } from "./auth";
 import { projects } from "./projects";
 import { tickets } from "./tickets";
+import { organization } from "./organization";
 
 export const ticketHistory = sqliteTable(
   "ticket_history",
@@ -58,11 +59,39 @@ export const activityLog = sqliteTable(
   })
 );
 
+export const teamActivity = sqliteTable(
+  "team_activity",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    action: text("action").notNull(), // "member_joined", "member_left", "role_changed", "team_updated", "project_created", etc.
+    details: text("details", { mode: "json" }).$type<Record<string, unknown>>(),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (table) => ({
+    organizationIdx: index("team_activity_organization_idx").on(table.organizationId),
+    userIdx: index("team_activity_user_idx").on(table.userId),
+    createdIdx: index("team_activity_created_idx").on(table.createdAt),
+  })
+);
+
 // Type exports
 export type TicketHistory = typeof ticketHistory.$inferSelect;
 export type NewTicketHistory = typeof ticketHistory.$inferInsert;
 export type ActivityLog = typeof activityLog.$inferSelect;
 export type NewActivityLog = typeof activityLog.$inferInsert;
+export type TeamActivity = typeof teamActivity.$inferSelect;
+export type NewTeamActivity = typeof teamActivity.$inferInsert;
+
 
 
 
