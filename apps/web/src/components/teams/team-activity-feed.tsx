@@ -14,7 +14,8 @@ import {
   FolderKanban,
   Mail,
   MailCheck,
-  X
+  X,
+  Link
 } from "lucide-react";
 import type { TeamActivityAction } from "@/hooks/use-team-activity";
 
@@ -44,6 +45,8 @@ function getActivityIcon(action: TeamActivityAction) {
       return <MailCheck className="h-4 w-4" />;
     case 'invitation_cancelled':
       return <X className="h-4 w-4" />;
+    case 'invitation_link_generated':
+      return <Link className="h-4 w-4" />;
     default:
       return <Users className="h-4 w-4" />;
   }
@@ -78,6 +81,9 @@ function getActivityMessage(action: TeamActivityAction, details: Record<string, 
       return `${name} accepted the team invitation`;
     case 'invitation_cancelled':
       return `${name} cancelled an invitation`;
+    case 'invitation_link_generated':
+      const role = details?.role as string || 'member';
+      return `${name} generated an invite link for ${role} role`;
     default:
       return `${name} performed an action`;
   }

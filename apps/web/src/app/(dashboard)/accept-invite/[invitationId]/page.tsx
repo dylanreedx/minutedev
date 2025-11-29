@@ -81,7 +81,8 @@ export default async function AcceptInvitePage({
         args: [invitation.organizationId],
       });
       if (orgResult.rows?.[0]) {
-        organizationName = (orgResult.rows[0] as { name: string }).name;
+        const row = orgResult.rows[0] as unknown as { name: string };
+        organizationName = row.name;
       }
     } catch (error) {
       console.error("Error fetching organization name:", error);

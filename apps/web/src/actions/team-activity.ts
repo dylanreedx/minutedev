@@ -28,7 +28,8 @@ export type TeamActivityAction =
   | 'project_created'
   | 'invitation_sent'
   | 'invitation_accepted'
-  | 'invitation_cancelled';
+  | 'invitation_cancelled'
+  | 'invitation_link_generated';
 
 // Create activity log entry
 export async function logTeamActivity(
