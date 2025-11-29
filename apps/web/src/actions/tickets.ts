@@ -63,10 +63,11 @@ async function verifyProjectPermission(
     return { success: true, project };
   }
 
-  // Check organization permission
+  // Check organization permission - must pass organizationId explicitly
   const hasPermission = await auth.api.hasPermission({
     headers: await headers(),
     body: {
+      organizationId: project.organizationId,
       permissions: {
         project: [permission],
       },
