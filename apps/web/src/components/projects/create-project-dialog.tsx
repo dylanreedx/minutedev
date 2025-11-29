@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -15,10 +15,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateProject } from "@/hooks/use-projects";
+import { TeamSelector } from "@/components/teams/team-selector";
+import { useTeams } from "@/hooks/use-teams";
 
 interface CreateProjectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  defaultTeamId?: string;
 }
 
 // Utility function to generate slug from name (matches server logic)
@@ -34,10 +37,25 @@ function generateSlug(name: string): string {
 export function CreateProjectDialog({
   open,
   onOpenChange,
+  defaultTeamId,
 }: CreateProjectDialogProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [teamId, setTeamId] = useState<string>(defaultTeamId || "");
   const createProject = useCreateProject();
+  const { data: teams = [] } = useTeams();
+
+  // Auto-select default team or first team if only one exists
+  useEffect(() => {
+    if (defaultTeamId) {
+      setTeamId(defaultTeamId);
+    } else if (teams.length === 1 && !teamId) {
+      const firstTeam = teams[0] as any;
+      if (firstTeam?.id) {
+        setTeamId(firstTeam.id);
+      }
+    }
+  }, [teams, teamId, defaultTeamId]);
 
   const slugPreview = name ? generateSlug(name) : "";
   const isLoading = createProject.isPending;
@@ -45,7 +63,7 @@ export function CreateProjectDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!name.trim()) {
+    if (!name.trim() || !teamId) {
       return;
     }
 
@@ -53,11 +71,13 @@ export function CreateProjectDialog({
       await createProject.mutateAsync({
         name: name.trim(),
         description: description.trim() || undefined,
+        teamId,
       });
 
       // Reset form and close dialog on success
       setName("");
       setDescription("");
+      setTeamId("");
       onOpenChange(false);
     } catch (error) {
       // Error handling is done in the mutation hook
@@ -72,6 +92,7 @@ export function CreateProjectDialog({
       if (!newOpen) {
         setName("");
         setDescription("");
+        setTeamId(defaultTeamId || "");
       }
     }
   };
@@ -87,6 +108,21 @@ export function CreateProjectDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="team">
+              Team <span className="text-destructive">*</span>
+            </Label>
+            <TeamSelector
+              value={teamId}
+              onValueChange={setTeamId}
+              disabled={isLoading}
+              placeholder="Select a team..."
+            />
+            <p className="text-xs text-muted-foreground">
+              Projects must belong to a team. Create a team if you don't have one.
+            </p>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="name">
               Project Name <span className="text-destructive">*</span>
@@ -139,7 +175,7 @@ export function CreateProjectDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading || !name.trim()}>
+            <Button type="submit" disabled={isLoading || !name.trim() || !teamId}>
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

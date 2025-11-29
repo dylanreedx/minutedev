@@ -24,7 +24,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useProject, useUpdateProject, useDeleteProject } from "@/hooks/use-projects";
+import { useProject, useUpdateProject, useDeleteProject, useProjectMembers } from "@/hooks/use-projects";
+import { Separator } from "@/components/ui/separator";
+import { InviteMemberDialog } from "./invite-member-dialog";
+import { ProjectInvitesList } from "./project-invites-list";
+import { UserPlus, Users, Shield, Eye } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 
 interface EditProjectSheetProps {
   open: boolean;
@@ -40,8 +46,13 @@ export function EditProjectSheet({
   const { data: project, isLoading: isLoadingProject } = useProject(
     projectSlug || ""
   );
+  const { data: members = [], isLoading: isLoadingMembers } = useProjectMembers(
+    project?.id || "",
+    { enabled: !!project?.id }
+  );
   const updateProject = useUpdateProject();
   const deleteProject = useDeleteProject();
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -158,6 +169,123 @@ export function EditProjectSheet({
                     {description.length}/500 characters
                   </p>
                 </div>
+
+                <Separator />
+
+                {/* Permissions & Access Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-4 w-4 text-muted-foreground" />
+                        <Label className="text-base font-semibold">Permissions & Access</Label>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Manage who can view and edit this project
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Visibility Info */}
+                  <div className="rounded-lg border p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Eye className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">Visibility</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">Team Only</Badge>
+                      <span className="text-xs text-muted-foreground">
+                        Only team members can access this project
+                      </span>
+                    </div>
+                    {project?.organizationId && (
+                      <p className="text-xs text-muted-foreground">
+                        All members of the team have access based on their role.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Team Members Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Users className="h-4 w-4 text-muted-foreground" />
+                          <Label className="text-base font-semibold">Team Members</Label>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Manage who has access to this project
+                        </p>
+                      </div>
+                    {project?.id && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setInviteDialogOpen(true)}
+                        disabled={isFormLoading}
+                      >
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        Invite
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Members List */}
+                  {isLoadingMembers ? (
+                    <div className="space-y-2">
+                      <div className="h-12 w-full bg-muted animate-pulse rounded" />
+                      <div className="h-12 w-full bg-muted animate-pulse rounded" />
+                    </div>
+                  ) : members.length > 0 ? (
+                    <div className="space-y-2 rounded-lg border p-3">
+                      {members.map((member) => (
+                        <div
+                          key={member.id}
+                          className="flex items-center gap-3 py-2"
+                        >
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={member.image || undefined} />
+                            <AvatarFallback>
+                              {member.name
+                                ? member.name
+                                    .split(" ")
+                                    .map((n) => n[0])
+                                    .join("")
+                                    .toUpperCase()
+                                    .slice(0, 2)
+                                : member.email?.[0]?.toUpperCase() || "?"}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">
+                              {member.name || "Unknown"}
+                            </p>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {member.email}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-dashed p-4 text-center">
+                      <p className="text-sm text-muted-foreground">
+                        No members yet. Invite team members to collaborate.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Pending Invitations */}
+                  {project?.id && (
+                    <div className="mt-4">
+                      <ProjectInvitesList projectId={project.id} />
+                    </div>
+                  )}
+                </div>
               </div>
 
               <SheetFooter className="flex-col sm:flex-row gap-2 pt-4 pb-6 px-6 border-t bg-muted/50 flex-shrink-0">
@@ -233,6 +361,15 @@ export function EditProjectSheet({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    {/* Invite Dialog */}
+    {project?.id && (
+      <InviteMemberDialog
+        open={inviteDialogOpen}
+        onOpenChange={setInviteDialogOpen}
+        projectId={project.id}
+      />
+    )}
     </>
   );
 }
