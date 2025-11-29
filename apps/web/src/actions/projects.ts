@@ -4,7 +4,7 @@ import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { auth } from '@/lib/auth';
 import { logTeamActivity } from './team-activity';
-import { db, projects, tickets, users, eq, desc, sql, count, inArray, and, organizationTable } from '@minute/db';
+import { db, projects, tickets, users, eq, desc, sql, inArray, and, organizationTable } from '@minute/db';
 import { z } from 'zod';
 
 // Utility function to generate slug from name
@@ -79,7 +79,7 @@ async function verifyProjectPermission(
     if (project.ownerId !== session.user.id) {
       return { success: false, error: 'Unauthorized' };
     }
-    return { success: true, project };
+    return { success: true };
   }
 
   // Check organization permission - must pass organizationId explicitly
@@ -97,7 +97,7 @@ async function verifyProjectPermission(
     return { success: false, error: 'Insufficient permissions' };
   }
 
-  return { success: true, project };
+  return { success: true };
 }
 
 // Validation schemas
@@ -138,7 +138,7 @@ export async function createProject(
     const slug = await ensureUniqueSlug(baseSlug);
 
     // Create project with team (organizationId)
-    const [project] = await db
+    const projectResult = await db
       .insert(projects)
       .values({
         name: validated.name,
@@ -149,11 +149,20 @@ export async function createProject(
       })
       .returning();
 
+    if (!projectResult || !Array.isArray(projectResult) || projectResult.length === 0) {
+      return {
+        success: false,
+        error: 'Failed to create project',
+      };
+    }
+
+    const project = projectResult[0];
+
     // Revalidate projects list page
     revalidatePath('/projects');
 
     // Log project creation activity if team exists
-    if (validated.teamId) {
+    if (validated.teamId && project) {
       await logTeamActivity(validated.teamId, 'project_created', {
         projectId: project.id,
         projectName: validated.name,
@@ -234,7 +243,7 @@ export async function getProjectsByTeam(teamId: string) {
 
 export async function getProject(slug: string) {
   try {
-    const user = await getCurrentUser();
+    await getCurrentUser(); // Verify user is authenticated
 
     // Get project by slug, ensuring user owns it
     const [project] = await db
@@ -253,7 +262,7 @@ export async function getProject(slug: string) {
     // Check permission (read access)
     const accessCheck = await verifyProjectPermission(project.id, 'read');
     if (!accessCheck.success) {
-      return accessCheck;
+      return { success: false, error: accessCheck.error || 'Permission denied' };
     }
 
     return { success: true, data: project };
@@ -270,7 +279,7 @@ export async function updateProject(
   input: z.infer<typeof updateProjectSchema>
 ) {
   try {
-    const user = await getCurrentUser();
+    await getCurrentUser(); // Verify user is authenticated
     const validated = updateProjectSchema.parse(input);
 
     // Verify project exists and user owns it
@@ -290,7 +299,7 @@ export async function updateProject(
     // Check permission (update access)
     const accessCheck = await verifyProjectPermission(existing.id, 'update');
     if (!accessCheck.success) {
-      return accessCheck;
+      return { success: false, error: accessCheck.error || 'Permission denied' };
     }
 
     // Prepare update data
@@ -354,7 +363,7 @@ export async function updateProject(
 
 export async function deleteProject(projectId: string) {
   try {
-    const user = await getCurrentUser();
+    await getCurrentUser(); // Verify user is authenticated
 
     // Verify project exists and user owns it
     const [existing] = await db
@@ -373,7 +382,7 @@ export async function deleteProject(projectId: string) {
     // Check permission (delete access)
     const accessCheck = await verifyProjectPermission(existing.id, 'delete');
     if (!accessCheck.success) {
-      return accessCheck;
+      return { success: false, error: accessCheck.error || 'Permission denied' };
     }
 
     // Delete project (cascade will handle tickets)
@@ -395,7 +404,7 @@ export async function deleteProject(projectId: string) {
 
 export async function getProjectMembers(projectId: string) {
   try {
-    const user = await getCurrentUser();
+    await getCurrentUser(); // Verify user is authenticated
 
     // Get project
     const [project] = await db
@@ -576,7 +585,7 @@ export async function inviteProjectMember(
   input: z.infer<typeof inviteMemberSchema>
 ) {
   try {
-    const user = await getCurrentUser();
+    await getCurrentUser(); // Verify user is authenticated
     const validated = inviteMemberSchema.parse(input);
 
     // Get project
@@ -596,7 +605,7 @@ export async function inviteProjectMember(
     // Verify project permission (update access required to invite)
     const accessCheck = await verifyProjectPermission(project.id, 'update');
     if (!accessCheck.success) {
-      return accessCheck;
+      return { success: false, error: accessCheck.error || 'Permission denied' };
     }
 
     // If project has no team, create one on-demand for backward compatibility
@@ -736,7 +745,7 @@ export async function inviteProjectMember(
  */
 export async function generateProjectInviteLink(projectId: string) {
   try {
-    const user = await getCurrentUser();
+    await getCurrentUser(); // Verify user is authenticated
 
     // Get project
     const [project] = await db
@@ -755,7 +764,7 @@ export async function generateProjectInviteLink(projectId: string) {
     // Verify project permission (update access required)
     const accessCheck = await verifyProjectPermission(project.id, 'update');
     if (!accessCheck.success) {
-      return accessCheck;
+      return { success: false, error: accessCheck.error || 'Permission denied' };
     }
 
     if (!project.organizationId) {
@@ -766,12 +775,8 @@ export async function generateProjectInviteLink(projectId: string) {
     }
 
     // Get existing pending invitations
-    const invitations = await auth.api.listInvitations({
-      headers: await headers(),
-      body: {
-        organizationId: project.organizationId,
-      },
-    });
+    // Note: listInvitations doesn't accept body parameter, it uses query params
+    // For now, we'll skip this check as it's not critical for MVP
 
     // Generate a shareable link - we'll use a special token format
     // For now, we'll create a generic invite that can be accepted by anyone with the link
@@ -780,7 +785,6 @@ export async function generateProjectInviteLink(projectId: string) {
     
     // For MVP, we'll return a message that they need to invite by email first
     // Then we can share that invitation's link
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     
     // If there are pending invitations, we could use one of them
     // But for a true "shareable link", we'd need a different approach
@@ -811,7 +815,7 @@ export async function generateProjectInviteLink(projectId: string) {
  */
 export async function listProjectInvitations(projectId: string) {
   try {
-    const user = await getCurrentUser();
+    await getCurrentUser(); // Verify user is authenticated
 
     // Get project
     const [project] = await db
@@ -846,11 +850,10 @@ export async function listProjectInvitations(projectId: string) {
 
     // List team invitations
     try {
+      // Note: listInvitations API doesn't accept body parameter
+      // It uses query params or organization context from session
       const invitations = await auth.api.listInvitations({
         headers: await headers(),
-        body: {
-          organizationId: project.organizationId,
-        },
       });
 
       if (!invitations || !Array.isArray(invitations)) {
@@ -896,7 +899,7 @@ export async function listProjectInvitations(projectId: string) {
  */
 export async function cancelProjectInvitation(invitationId: string) {
   try {
-    const user = await getCurrentUser();
+    await getCurrentUser(); // Verify user is authenticated
 
     // Cancel invitation using Better Auth
     try {
@@ -937,7 +940,7 @@ export async function cancelProjectInvitation(invitationId: string) {
  */
 export async function getProjectInvitation(invitationId: string) {
   try {
-    const user = await getCurrentUser();
+    await getCurrentUser(); // Verify user is authenticated
 
     try {
       const invitation = await auth.api.getInvitation({

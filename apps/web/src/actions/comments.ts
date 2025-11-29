@@ -11,8 +11,6 @@ import {
   users,
   eq,
   and,
-  desc,
-  type Comment,
 } from '@minute/db';
 import { z } from 'zod';
 
@@ -143,7 +141,7 @@ export async function createComment(
     // Create comment
     // Note: Don't set updatedAt explicitly - let database default handle it
     // This ensures createdAt and updatedAt are the same for new comments
-    const [comment] = await db
+    const commentResult = await db
       .insert(comments)
       .values({
         ticketId: validated.ticketId,
@@ -152,6 +150,15 @@ export async function createComment(
         parentId: validated.parentId || null,
       })
       .returning();
+    
+    if (!commentResult || !Array.isArray(commentResult) || commentResult.length === 0) {
+      return {
+        success: false,
+        error: 'Failed to create comment',
+      };
+    }
+    
+    const comment = commentResult[0];
 
     // Revalidate ticket pages
     if (accessCheck.success && accessCheck.project) {
@@ -180,7 +187,7 @@ export async function createComment(
 
 export async function getComments(ticketId: string) {
   try {
-    const user = await getCurrentUser();
+    await getCurrentUser(); // Verify user is authenticated
 
     // Get ticket to find project
     const [ticket] = await db
@@ -290,7 +297,7 @@ export async function updateComment(
     }
 
     // Update comment
-    const [updated] = await db
+    const updatedResult = await db
       .update(comments)
       .set({
         content: validated.content,
@@ -298,6 +305,15 @@ export async function updateComment(
       })
       .where(eq(comments.id, validated.id))
       .returning();
+    
+    if (!updatedResult || !Array.isArray(updatedResult) || updatedResult.length === 0) {
+      return {
+        success: false,
+        error: 'Comment not found or update failed',
+      };
+    }
+    
+    const updated = updatedResult[0];
 
     // Revalidate ticket pages
     if (accessCheck.success && accessCheck.project) {

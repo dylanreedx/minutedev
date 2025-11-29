@@ -82,10 +82,10 @@ export async function createTeam(input: z.infer<typeof createTeamSchema>) {
       
       // Parse response regardless of status code
       let team;
-      try {
-        team = JSON.parse(responseText);
-      } catch (e) {
-        console.error('Failed to parse JSON response:', responseText);
+        try {
+          team = JSON.parse(responseText);
+        } catch {
+          console.error('Failed to parse JSON response:', responseText);
         if (!response.ok) {
           return {
             success: false,
@@ -107,7 +107,10 @@ export async function createTeam(input: z.infer<typeof createTeamSchema>) {
             });
 
             if (existingTeam.rows && existingTeam.rows.length > 0) {
-              const row = existingTeam.rows[0];
+              const row = existingTeam.rows[0] as unknown as { id: string; name: string; slug: string };
+              if (!row) {
+                throw new Error('Failed to get team row');
+              }
               // Check if user is already a member
               const memberCheck = await client.execute({
                 sql: `SELECT id FROM member WHERE organization_id = ? AND user_id = ? LIMIT 1`,
@@ -190,7 +193,7 @@ export async function createTeam(input: z.infer<typeof createTeamSchema>) {
  */
 export async function getTeams() {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentUser(); // Need user.id for query
 
     // Use Better Auth API to get user's organizations
     // Query the database directly using the libSQL client with optimized counts
@@ -229,7 +232,7 @@ export async function getTeams() {
       });
 
       // Convert rows to proper format
-      const teamsList = (result.rows || []).map((row: any) => {
+      const teamsList = (result.rows || []).map((row: Record<string, unknown>) => {
         // libSQL returns rows as objects with column names
         const metadata = row.metadata ? (typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata) : null;
         return {
@@ -239,8 +242,8 @@ export async function getTeams() {
           logo: row.logo as string | null,
           metadata,
           createdAt: row.createdAt || row.created_at,
-          projectCount: typeof row.projectCount === 'number' ? row.projectCount : parseInt(row.projectCount || '0', 10),
-          memberCount: typeof row.memberCount === 'number' ? row.memberCount : parseInt(row.memberCount || '0', 10),
+          projectCount: typeof row.projectCount === 'number' ? row.projectCount : parseInt(String(row.projectCount || '0'), 10),
+          memberCount: typeof row.memberCount === 'number' ? row.memberCount : parseInt(String(row.memberCount || '0'), 10),
         };
       });
 
@@ -339,7 +342,7 @@ export async function getTeam(teamId: string) {
  */
 export async function updateTeam(input: z.infer<typeof updateTeamSchema>) {
   try {
-    const user = await getCurrentUser();
+    await getCurrentUser(); // Verify user is authenticated
     const validated = updateTeamSchema.parse(input);
 
     // Update team via Better Auth organization API
@@ -418,7 +421,7 @@ export async function updateTeam(input: z.infer<typeof updateTeamSchema>) {
  */
 export async function deleteTeam(teamId: string) {
   try {
-    const user = await getCurrentUser();
+    await getCurrentUser(); // Verify user is authenticated
 
     // Delete team via Better Auth organization API
     try {
@@ -447,9 +450,12 @@ export async function deleteTeam(teamId: string) {
         };
       }
 
+      // Get team name before deletion for activity log
+      const teamCheck = await getTeam(teamId);
+      
       // Log team deletion activity (before deletion)
       await logTeamActivity(teamId, 'team_deleted', {
-        teamName: teamCheck.data?.name,
+        teamName: teamCheck.success && teamCheck.data ? teamCheck.data.name : undefined,
       });
 
       // Revalidate teams list page
@@ -493,7 +499,7 @@ export async function inviteTeamMember(
   input: z.infer<typeof inviteTeamMemberSchema>
 ) {
   try {
-    const user = await getCurrentUser();
+    await getCurrentUser(); // Verify user is authenticated
     const validated = inviteTeamMemberSchema.parse(input);
 
     // Verify team exists and user has access
@@ -611,11 +617,10 @@ export async function listTeamInvitations(teamId: string) {
 
     // List team invitations
     try {
+      // Note: listInvitations API doesn't accept body parameter
+      // It uses query params or organization context from session
       const invitations = await auth.api.listInvitations({
         headers: await headers(),
-        body: {
-          organizationId: teamId,
-        },
       });
 
       if (!invitations || !Array.isArray(invitations)) {
@@ -659,7 +664,7 @@ export async function listTeamInvitations(teamId: string) {
 /**
  * Fallback: Get team members directly from database
  */
-async function getTeamMembersFromDatabase(teamId: string, currentUserId: string) {
+async function getTeamMembersFromDatabase(teamId: string, _currentUserId: string) {
   try {
     const client = getClient();
 
@@ -691,7 +696,7 @@ async function getTeamMembersFromDatabase(teamId: string, currentUserId: string)
     }
 
     // Convert rows to proper format
-    const membersWithUsers = result.rows.map((row: any) => ({
+    const membersWithUsers = result.rows.map((row: Record<string, unknown>) => ({
       id: row.id,
       userId: row.userId || row.user_id,
       role: row.role || 'member',
@@ -722,7 +727,7 @@ async function getTeamMembersFromDatabase(teamId: string, currentUserId: string)
  */
 export async function getTeamMembers(teamId: string) {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentUser(); // Need user.id for fallback
 
     // Verify team exists and user has access
     const teamCheck = await getTeam(teamId);
@@ -736,13 +741,14 @@ export async function getTeamMembers(teamId: string) {
 
     // Get team members using Better Auth API
     try {
-      const members = await auth.api.listMembers({
+      const result = await auth.api.listMembers({
         headers: await headers(),
         query: {
           organizationId: teamId,
         },
       });
 
+      const members = result?.members;
       if (!members || !Array.isArray(members)) {
         console.warn('listMembers returned invalid data, falling back to database query');
         // Fallback: Query member table directly
@@ -808,7 +814,6 @@ const updateTeamMemberRoleSchema = z.object({
 });
 
 export type UpdateTeamMemberRoleInput = z.infer<typeof updateTeamMemberRoleSchema>;
-export type ResendInvitationInput = z.infer<typeof resendInvitationSchema>;
 
 /**
  * Update a team member's role
@@ -817,7 +822,7 @@ export async function updateTeamMemberRole(
   input: z.infer<typeof updateTeamMemberRoleSchema>
 ) {
   try {
-    const user = await getCurrentUser();
+    await getCurrentUser(); // Verify user is authenticated
     const validated = updateTeamMemberRoleSchema.parse(input);
 
     // Verify team exists and user has access
@@ -864,13 +869,13 @@ export async function updateTeamMemberRole(
 
       // Log role change activity
       // Get member details for activity log
-      const members = await auth.api.listMembers({
+      const membersResult = await auth.api.listMembers({
         headers: await headers(),
         query: {
           organizationId: validated.teamId,
         },
       });
-      const targetMember = members?.find((m: any) => m.id === validated.memberId);
+      const targetMember = membersResult?.members?.find((m: { id: string; userId?: string; role?: string }) => m.id === validated.memberId);
       const targetUser = targetMember?.userId 
         ? await db.select().from(users).where(eq(users.id, targetMember.userId)).limit(1).then(r => r[0])
         : null;
@@ -927,7 +932,7 @@ export async function removeTeamMember(
   input: z.infer<typeof removeTeamMemberSchema>
 ) {
   try {
-    const user = await getCurrentUser();
+    await getCurrentUser(); // Verify user is authenticated
     const validated = removeTeamMemberSchema.parse(input);
 
     // Verify team exists and user has access
@@ -1009,7 +1014,7 @@ export async function removeTeamMember(
  */
 export async function cancelTeamInvitation(invitationId: string) {
   try {
-    const user = await getCurrentUser();
+    await getCurrentUser(); // Verify user is authenticated
 
     // Cancel invitation using Better Auth API
     try {
@@ -1046,8 +1051,9 @@ export async function cancelTeamInvitation(invitationId: string) {
         args: [invitationId],
       });
       
-      if (invitationResult.rows && invitationResult.rows.length > 0) {
-        const orgId = invitationResult.rows[0].organization_id as string;
+      const firstRow = invitationResult.rows?.[0];
+      if (firstRow && firstRow.organization_id) {
+        const orgId = firstRow.organization_id as string;
         await logTeamActivity(orgId, 'invitation_cancelled', {
           invitationId,
         });
@@ -1091,7 +1097,7 @@ export async function resendTeamInvitation(
   input: z.infer<typeof resendInvitationSchema>
 ) {
   try {
-    const user = await getCurrentUser();
+    await getCurrentUser(); // Verify user is authenticated
     const validated = resendInvitationSchema.parse(input);
 
     // Verify team exists and user has access

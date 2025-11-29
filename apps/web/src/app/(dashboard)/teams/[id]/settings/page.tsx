@@ -206,7 +206,7 @@ export default function TeamSettingsPage() {
 
   // Get current user's role in the team
   const currentUserMember = members.find((m: any) => m.userId === currentUserId);
-  const currentUserRole: TeamRole | null = currentUserMember?.role || null;
+  const currentUserRole: TeamRole | null = (currentUserMember?.role as TeamRole) || null;
 
   // Permission checks
   const canUpdateSettings = currentUserRole ? canUpdateTeamSettings(currentUserRole) : false;

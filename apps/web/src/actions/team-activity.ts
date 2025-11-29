@@ -3,7 +3,6 @@
 import { headers } from 'next/headers';
 import { auth } from '@/lib/auth';
 import { db, teamActivity, users, eq, desc, organization } from '@minute/db';
-import { z } from 'zod';
 
 // Get current user session
 async function getCurrentUser() {
@@ -58,7 +57,7 @@ export async function logTeamActivity(
 // Get team activity
 export async function getTeamActivity(teamId: string, limit: number = 50) {
   try {
-    const user = await getCurrentUser();
+    await getCurrentUser(); // Verify user is authenticated
 
     // Verify team exists and user has access
     const teamCheck = await db

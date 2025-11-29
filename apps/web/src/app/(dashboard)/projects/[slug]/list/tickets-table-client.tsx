@@ -334,7 +334,7 @@ export function TicketsTableClient({ slug, projectId, projectName }: { slug: str
                           .slice(0, 2);
                       }
                       if (assignee.email) {
-                        return assignee.email[0].toUpperCase();
+                        return assignee.email.charAt(0).toUpperCase() || "?";
                       }
                       return "?";
                     };

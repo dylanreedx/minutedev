@@ -138,7 +138,9 @@ export function useUpdateProject() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
-      queryClient.invalidateQueries({ queryKey: projectKeys.detail(data.slug) });
+      if (data?.slug) {
+        queryClient.invalidateQueries({ queryKey: projectKeys.detail(data.slug) });
+      }
       toast.success("Project updated successfully!");
     },
     onError: (error: Error) => {

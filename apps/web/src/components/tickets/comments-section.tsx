@@ -121,7 +121,7 @@ export function CommentsSection({ ticketId }: CommentsSectionProps) {
         .toUpperCase()
         .slice(0, 2);
     }
-    return email[0].toUpperCase();
+    return email.charAt(0).toUpperCase() || "?";
   };
 
   const formatDate = (date: Date | number) => {

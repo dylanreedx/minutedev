@@ -38,9 +38,7 @@ export function AcceptInviteClient({
     setIsAccepting(true);
     try {
       await authClient.organization.acceptInvitation({
-        body: {
-          invitationId,
-        },
+        invitationId,
       });
 
       setStatus("accepted");
@@ -64,9 +62,7 @@ export function AcceptInviteClient({
     setIsRejecting(true);
     try {
       await authClient.organization.rejectInvitation({
-        body: {
-          invitationId,
-        },
+        invitationId,
       });
 
       setStatus("rejected");

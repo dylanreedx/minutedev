@@ -335,7 +335,7 @@ export function EditTicketSheet({
                                 alt={member.name || member.email}
                               />
                               <AvatarFallback className="text-xs">
-                                {(member.name || member.email)[0].toUpperCase()}
+                                {(member.name || member.email || "?").charAt(0).toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
                             <span>{member.name || member.email}</span>
@@ -346,9 +346,11 @@ export function EditTicketSheet({
                   </Select>
                 </div>
 
-                <div className="pt-4 border-t">
-                  <CommentsSection ticketId={ticketId} />
-                </div>
+                {ticketId && (
+                  <div className="pt-4 border-t">
+                    <CommentsSection ticketId={ticketId} />
+                  </div>
+                )}
                 </div>
 
                 <SheetFooter className="flex-col sm:flex-row gap-2 pt-4 pb-6 px-6 border-t bg-muted/50 flex-shrink-0">

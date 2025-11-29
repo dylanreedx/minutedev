@@ -124,7 +124,7 @@ function SortableTicketCard({
         .slice(0, 2);
     }
     if (assignee.email) {
-      return assignee.email[0].toUpperCase();
+      return assignee.email.charAt(0).toUpperCase() || "?";
     }
     return "?";
   };

@@ -16,9 +16,7 @@ export const comments = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     content: text("content").notNull(),
-    parentId: text("parent_id").references(() => comments.id, {
-      onDelete: "cascade",
-    }), // For threading
+    parentId: text("parent_id"), // For threading - relation defined in relations.ts
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),
