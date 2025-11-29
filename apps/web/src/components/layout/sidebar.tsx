@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { FolderKanban, LayoutDashboard, LogOut, Settings } from "lucide-react";
+import { FolderKanban, LayoutDashboard, LogOut, Settings, Users, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { signOut } from "@/lib/auth-client";
 import { toast } from "sonner";
+import { useState } from "react";
 
 interface User {
   id: string;
@@ -31,9 +32,16 @@ interface SidebarProps {
 
 const navigation = [
   {
-    name: "Projects",
-    href: "/projects",
-    icon: FolderKanban,
+    name: "Teams",
+    href: "/teams",
+    icon: Users,
+    children: [
+      {
+        name: "Projects",
+        href: "/projects",
+        icon: FolderKanban,
+      },
+    ],
   },
 ];
 
@@ -49,6 +57,13 @@ function getInitials(name: string): string {
 export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const [expandedItems, setExpandedItems] = useState<string[]>(() => {
+    // Auto-expand if on a child route
+    if (pathname.startsWith("/projects")) {
+      return ["Teams"];
+    }
+    return [];
+  });
 
   const handleSignOut = async () => {
     try {
@@ -59,6 +74,14 @@ export function Sidebar({ user }: SidebarProps) {
     } catch {
       toast.error("Failed to sign out");
     }
+  };
+
+  const toggleExpanded = (itemName: string) => {
+    setExpandedItems((prev) =>
+      prev.includes(itemName)
+        ? prev.filter((name) => name !== itemName)
+        : [...prev, itemName]
+    );
   };
 
   return (
@@ -75,20 +98,79 @@ export function Sidebar({ user }: SidebarProps) {
       <nav className="flex-1 space-y-1 p-3">
         {navigation.map((item) => {
           const isActive = pathname.startsWith(item.href);
+          const isExpanded = expandedItems.includes(item.name);
+          const hasChildren = item.children && item.children.length > 0;
+
           return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+            <div key={item.name}>
+              <div className="flex items-center">
+                {hasChildren ? (
+                  <div className="flex flex-1 items-center gap-1">
+                    <Link
+                      href={item.href}
+                      className={cn(
+                        "flex flex-1 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                        isActive
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                      )}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      <span className="flex-1 text-left">{item.name}</span>
+                    </Link>
+                    <button
+                      onClick={() => toggleExpanded(item.name)}
+                      className={cn(
+                        "p-1 rounded-md transition-colors",
+                        "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                      )}
+                    >
+                      <ChevronRight
+                        className={cn(
+                          "h-4 w-4 transition-transform",
+                          isExpanded && "rotate-90"
+                        )}
+                      />
+                    </button>
+                  </div>
+                ) : (
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                      isActive
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                        : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                    )}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    {item.name}
+                  </Link>
+                )}
+              </div>
+              {hasChildren && isExpanded && (
+                <div className="ml-4 mt-1 space-y-1 border-l border-border pl-2">
+                  {item.children?.map((child) => {
+                    const isChildActive = pathname.startsWith(child.href);
+                    return (
+                      <Link
+                        key={child.name}
+                        href={child.href}
+                        className={cn(
+                          "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                          isChildActive
+                            ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                            : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                        )}
+                      >
+                        <child.icon className="h-4 w-4" />
+                        {child.name}
+                      </Link>
+                    );
+                  })}
+                </div>
               )}
-            >
-              <item.icon className="h-4 w-4" />
-              {item.name}
-            </Link>
+            </div>
           );
         })}
       </nav>
