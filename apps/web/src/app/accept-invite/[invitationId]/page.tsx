@@ -1,7 +1,6 @@
-import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-import { authClient } from "@/lib/auth-client";
 import { AcceptInviteClient } from "./accept-invite-client";
 
 interface AcceptInvitePageProps {
@@ -89,12 +88,20 @@ export default async function AcceptInvitePage({
     }
 
     return (
-      <AcceptInviteClient
-        invitationId={invitationId}
-        invitation={invitation}
-        organizationName={organizationName}
-        isAuthenticated={!!session}
-      />
+      <Suspense fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold">Loading invitation...</h1>
+          </div>
+        </div>
+      }>
+        <AcceptInviteClient
+          invitationId={invitationId}
+          invitation={invitation}
+          organizationName={organizationName}
+          isAuthenticated={!!session}
+        />
+      </Suspense>
     );
   } catch (error) {
     console.error("Error fetching invitation:", error);
@@ -110,5 +117,4 @@ export default async function AcceptInvitePage({
     );
   }
 }
-
 

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
@@ -10,8 +10,10 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Loader2, Mail } from "lucide-react";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get("redirect") || "/projects";
   const [step, setStep] = useState<"signin" | "verify">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -59,7 +61,7 @@ export default function LoginPage() {
       }
 
       toast.success("Welcome back!");
-      router.push("/projects");
+      router.push(redirectUrl);
       router.refresh();
     } catch {
       toast.error("Something went wrong. Please try again.");
@@ -124,7 +126,7 @@ export default function LoginPage() {
         return;
       }
 
-      router.push("/projects");
+      router.push(redirectUrl);
       router.refresh();
     } catch {
       toast.error("Something went wrong. Please try again.");
@@ -138,7 +140,7 @@ export default function LoginPage() {
     try {
       await authClient.signIn.social({
         provider: "github",
-        callbackURL: "/projects",
+        callbackURL: redirectUrl,
       });
     } catch {
       toast.error("Failed to sign in with GitHub");
@@ -329,7 +331,7 @@ export default function LoginPage() {
         <p className="mt-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
           Don&apos;t have an account?{" "}
           <Link
-            href="/register"
+            href={redirectUrl !== "/projects" ? `/register?redirect=${encodeURIComponent(redirectUrl)}` : "/register"}
             className="font-medium text-zinc-900 hover:underline dark:text-zinc-100"
           >
             Sign up
@@ -337,5 +339,26 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 dark:bg-zinc-950">
+        <div className="w-full max-w-sm">
+          <div className="mb-8 text-center">
+            <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+              Welcome back
+            </h1>
+            <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+              Loading...
+            </p>
+          </div>
+        </div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }

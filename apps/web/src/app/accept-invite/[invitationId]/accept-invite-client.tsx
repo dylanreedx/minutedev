@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Loader2, CheckCircle2, XCircle, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { authClient } from "@/lib/auth-client";
+import { toast } from "sonner";
 
 interface AcceptInviteClientProps {
   invitationId: string;
@@ -35,42 +36,80 @@ export function AcceptInviteClient({
   isAuthenticated,
 }: AcceptInviteClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isAccepting, setIsAccepting] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
   const [status, setStatus] = useState<"idle" | "accepted" | "rejected">("idle");
   const [checkingAuth, setCheckingAuth] = useState(!isAuthenticated);
+  const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
 
-  // Check if user became authenticated (e.g., after signup/login)
+  // Check if user just authenticated (e.g., after signup/login redirect)
+  // This runs on mount and when authentication state changes
   useEffect(() => {
-    if (!isAuthenticated && checkingAuth) {
-      const checkAuth = async () => {
-        try {
-          const session = await authClient.getSession();
-          if (session) {
-            setCheckingAuth(false);
-            // User just authenticated, try to accept invitation automatically
-            setIsAccepting(true);
-            try {
-              await authClient.organization.acceptInvitation({
-                invitationId,
-              });
-              setStatus("accepted");
-              setTimeout(() => {
-                router.push("/projects");
-              }, 2000);
-            } catch (error) {
-              console.error("Error accepting invitation:", error);
-              setIsAccepting(false);
-            }
-          }
-        } catch (error) {
-          // User is still not authenticated
+    const checkAndAccept = async () => {
+      // Only check if we haven't already checked and user is authenticated
+      if (hasCheckedAuth) return;
+      
+      try {
+        const session = await authClient.getSession();
+        if (session && isAuthenticated) {
+          setHasCheckedAuth(true);
           setCheckingAuth(false);
+          
+          // User is authenticated, try to accept invitation automatically
+          setIsAccepting(true);
+          try {
+            await authClient.organization.acceptInvitation({
+              invitationId,
+            });
+            setStatus("accepted");
+            toast.success("Successfully joined the team!");
+            setTimeout(() => {
+              router.push("/projects");
+            }, 2000);
+          } catch (error) {
+            console.error("Error accepting invitation:", error);
+            setIsAccepting(false);
+            toast.error(
+              error instanceof Error
+                ? error.message
+                : "Failed to accept invitation. Please try again."
+            );
+          }
+        } else if (!session && !isAuthenticated) {
+          // User is not authenticated, stop checking
+          setCheckingAuth(false);
+          setHasCheckedAuth(true);
         }
-      };
-      checkAuth();
+      } catch (error) {
+        // Error checking session, stop checking
+        setCheckingAuth(false);
+        setHasCheckedAuth(true);
+      }
+    };
+
+    // Check immediately if user is authenticated
+    if (isAuthenticated && !hasCheckedAuth) {
+      checkAndAccept();
+    } else if (!isAuthenticated && !hasCheckedAuth) {
+      // If not authenticated, check once after a short delay to catch redirects
+      const timer = setTimeout(() => {
+        checkAndAccept();
+      }, 500);
+      return () => clearTimeout(timer);
     }
-  }, [isAuthenticated, checkingAuth, invitationId, router]);
+  }, [isAuthenticated, invitationId, router, hasCheckedAuth]);
+
+  // Also check when search params change (e.g., after redirect from auth)
+  useEffect(() => {
+    if (searchParams.get("accepted") === "true") {
+      // User was redirected here after accepting, but let's verify
+      if (isAuthenticated && !hasCheckedAuth) {
+        setHasCheckedAuth(true);
+        setCheckingAuth(false);
+      }
+    }
+  }, [searchParams, isAuthenticated, hasCheckedAuth]);
 
   const handleAccept = async () => {
     setIsAccepting(true);
@@ -80,13 +119,14 @@ export function AcceptInviteClient({
       });
 
       setStatus("accepted");
+      toast.success("Successfully joined the team!");
       // Redirect to projects page after a short delay
       setTimeout(() => {
         router.push("/projects");
       }, 2000);
     } catch (error) {
       console.error("Error accepting invitation:", error);
-      alert(
+      toast.error(
         error instanceof Error
           ? error.message
           : "Failed to accept invitation. Please try again."
@@ -104,13 +144,14 @@ export function AcceptInviteClient({
       });
 
       setStatus("rejected");
+      toast.info("Invitation declined");
       // Redirect to projects page after a short delay
       setTimeout(() => {
         router.push("/projects");
       }, 2000);
     } catch (error) {
       console.error("Error rejecting invitation:", error);
-      alert(
+      toast.error(
         error instanceof Error
           ? error.message
           : "Failed to reject invitation. Please try again."
@@ -130,7 +171,7 @@ export function AcceptInviteClient({
             </div>
             <CardTitle>Invitation Accepted!</CardTitle>
             <CardDescription>
-              You've successfully joined the team. Redirecting...
+              You've successfully joined {organizationName}. Redirecting...
             </CardDescription>
           </CardHeader>
         </Card>
@@ -167,7 +208,7 @@ export function AcceptInviteClient({
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
               <Users className="h-6 w-6 text-blue-600" />
             </div>
-            <CardTitle>Joining {organizationName}</CardTitle>
+            <CardTitle>Join {organizationName}</CardTitle>
             <CardDescription>
               {isLinkBasedInvite
                 ? "Create an account to join this team."
@@ -216,13 +257,20 @@ export function AcceptInviteClient({
     );
   }
 
-  if (checkingAuth) {
+  if (checkingAuth || isAccepting) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
-            <CardTitle className="mt-4">Checking...</CardTitle>
+            <CardTitle className="mt-4">
+              {isAccepting ? "Accepting invitation..." : "Checking..."}
+            </CardTitle>
+            <CardDescription>
+              {isAccepting 
+                ? "Please wait while we add you to the team."
+                : "Verifying your account..."}
+            </CardDescription>
           </CardHeader>
         </Card>
       </div>

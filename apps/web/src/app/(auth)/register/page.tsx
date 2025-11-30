@@ -305,7 +305,7 @@ function RegisterForm() {
         <p className="mt-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
           Already have an account?{" "}
           <Link
-            href="/login"
+            href={inviteId ? `/login?redirect=/accept-invite/${inviteId}` : "/login"}
             className="font-medium text-zinc-900 hover:underline dark:text-zinc-100"
           >
             Sign in
