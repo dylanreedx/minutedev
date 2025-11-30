@@ -49,6 +49,7 @@ interface EditTicketSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   ticketId: string | null;
+  projectId?: string; // Optional: if provided, will use cached list data for instant status display
 }
 
 const statusOptions: { value: TicketStatus; label: string }[] = [
@@ -69,9 +70,11 @@ export function EditTicketSheet({
   open,
   onOpenChange,
   ticketId,
+  projectId,
 }: EditTicketSheetProps) {
   const { data: ticket, isLoading: isLoadingTicket } = useTicket(ticketId || "", {
     enabled: !!ticketId && open,
+    projectId, // Pass projectId to enable cache lookup for instant status display
   });
   const updateTicket = useUpdateTicket();
   const deleteTicket = useDeleteTicket();

@@ -14,6 +14,7 @@ import {
   type ReorderTicketInput,
 } from "@/actions/tickets";
 import type { Ticket, TicketStatus } from "@minute/db";
+import type { TicketWithAssignee } from "@/actions/tickets";
 
 // Query keys
 export const ticketKeys = {
@@ -40,7 +41,48 @@ export function useTickets(projectId: string) {
   });
 }
 
-export function useTicket(ticketId: string, options?: { enabled?: boolean }) {
+export function useTicket(ticketId: string, options?: { enabled?: boolean; projectId?: string }) {
+  const queryClient = useQueryClient();
+  
+  // Try to get initial data from the cached list query if projectId is provided
+  // This provides instant status display when opening a ticket from the board/list
+  const initialData = (() => {
+    if (!options?.projectId || !ticketId) return undefined;
+    
+    const listData = queryClient.getQueryData<Record<TicketStatus, TicketWithAssignee[]>>(
+      ticketKeys.list(options.projectId)
+    );
+    
+    if (listData) {
+      // Search through all status groups to find the ticket
+      for (const status of Object.keys(listData) as TicketStatus[]) {
+        const ticket = listData[status]?.find((t) => t.id === ticketId);
+        if (ticket) {
+          // Return ticket in the format expected by getTicket (without assignee wrapper)
+          // The getTicket response is just a Ticket, not TicketWithAssignee
+          return {
+            id: ticket.id,
+            title: ticket.title,
+            description: ticket.description,
+            status: ticket.status,
+            priority: ticket.priority,
+            order: ticket.order,
+            projectId: ticket.projectId,
+            creatorId: ticket.creatorId,
+            assigneeId: ticket.assignee?.id || null,
+            dueDate: ticket.dueDate,
+            points: ticket.points,
+            metadata: ticket.metadata,
+            createdAt: ticket.createdAt,
+            updatedAt: ticket.updatedAt,
+          } as Ticket;
+        }
+      }
+    }
+    
+    return undefined;
+  })();
+  
   return useQuery({
     queryKey: ticketKeys.detail(ticketId),
     queryFn: async () => {
@@ -55,6 +97,9 @@ export function useTicket(ticketId: string, options?: { enabled?: boolean }) {
       throw new Error("Failed to fetch ticket");
     },
     enabled: options?.enabled !== undefined ? options.enabled : !!ticketId,
+    initialData,
+    // Use cached data immediately but still fetch in background to ensure freshness
+    staleTime: 0, // Always consider initial data stale, but use it for instant display
   });
 }
 

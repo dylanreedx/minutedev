@@ -751,6 +751,7 @@ export function BoardPageClient({
           }
         }}
         ticketId={selectedTicketId}
+        projectId={projectId}
       />
     </>
   );

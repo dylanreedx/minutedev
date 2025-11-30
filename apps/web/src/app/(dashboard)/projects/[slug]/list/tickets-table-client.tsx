@@ -60,6 +60,18 @@ function getPriorityBadgeVariant(priority: TicketPriority): string {
 type SortField = "title" | "status" | "priority" | "dueDate" | "createdAt" | "assignee" | null;
 type SortDirection = "asc" | "desc";
 
+// Sort icon component - defined outside to avoid recreation on each render
+function SortIcon({ field, sortField, sortDirection }: { field: SortField; sortField: SortField; sortDirection: SortDirection }) {
+  if (sortField !== field) {
+    return <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />;
+  }
+  return sortDirection === "asc" ? (
+    <ArrowUp className="ml-2 h-4 w-4" />
+  ) : (
+    <ArrowDown className="ml-2 h-4 w-4" />
+  );
+}
+
 export function TicketsTableClient({ slug, projectId, projectName }: { slug: string; projectId: string; projectName: string }) {
   const searchParams = useSearchParams();
   const { data: ticketsGrouped, isLoading, error } = useTickets(projectId);
@@ -179,18 +191,6 @@ export function TicketsTableClient({ slug, projectId, projectName }: { slug: str
     });
   }, [filteredTickets, sortField, sortDirection]);
 
-  // Sort icon component
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) {
-      return <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />;
-    }
-    return sortDirection === "asc" ? (
-      <ArrowUp className="ml-2 h-4 w-4" />
-    ) : (
-      <ArrowDown className="ml-2 h-4 w-4" />
-    );
-  };
-
   return (
     <>
       <Header title={projectName}>
@@ -258,7 +258,7 @@ export function TicketsTableClient({ slug, projectId, projectName }: { slug: str
                       className="flex items-center hover:text-foreground transition-colors cursor-pointer"
                     >
                       Title
-                      <SortIcon field="title" />
+                      <SortIcon field="title" sortField={sortField} sortDirection={sortDirection} />
                     </button>
                   </TableHead>
                   <TableHead>
@@ -267,7 +267,7 @@ export function TicketsTableClient({ slug, projectId, projectName }: { slug: str
                       className="flex items-center hover:text-foreground transition-colors cursor-pointer"
                     >
                       Status
-                      <SortIcon field="status" />
+                      <SortIcon field="status" sortField={sortField} sortDirection={sortDirection} />
                     </button>
                   </TableHead>
                   <TableHead>
@@ -276,7 +276,7 @@ export function TicketsTableClient({ slug, projectId, projectName }: { slug: str
                       className="flex items-center hover:text-foreground transition-colors cursor-pointer"
                     >
                       Priority
-                      <SortIcon field="priority" />
+                      <SortIcon field="priority" sortField={sortField} sortDirection={sortDirection} />
                     </button>
                   </TableHead>
                   <TableHead>
@@ -285,7 +285,7 @@ export function TicketsTableClient({ slug, projectId, projectName }: { slug: str
                       className="flex items-center hover:text-foreground transition-colors cursor-pointer"
                     >
                       Due Date
-                      <SortIcon field="dueDate" />
+                      <SortIcon field="dueDate" sortField={sortField} sortDirection={sortDirection} />
                     </button>
                   </TableHead>
                   <TableHead>
@@ -294,7 +294,7 @@ export function TicketsTableClient({ slug, projectId, projectName }: { slug: str
                       className="flex items-center hover:text-foreground transition-colors cursor-pointer"
                     >
                       Created
-                      <SortIcon field="createdAt" />
+                      <SortIcon field="createdAt" sortField={sortField} sortDirection={sortDirection} />
                     </button>
                   </TableHead>
                   <TableHead>
@@ -303,7 +303,7 @@ export function TicketsTableClient({ slug, projectId, projectName }: { slug: str
                       className="flex items-center hover:text-foreground transition-colors cursor-pointer"
                     >
                       Assignee
-                      <SortIcon field="assignee" />
+                      <SortIcon field="assignee" sortField={sortField} sortDirection={sortDirection} />
                     </button>
                   </TableHead>
                 </TableRow>
@@ -429,6 +429,7 @@ export function TicketsTableClient({ slug, projectId, projectName }: { slug: str
           }
         }}
         ticketId={selectedTicketId}
+        projectId={projectId}
       />
     </>
   );
