@@ -587,7 +587,7 @@ export async function generateTeamInviteLink(
       let invitation;
       try {
         invitation = JSON.parse(responseText);
-      } catch (parseError) {
+      } catch {
         console.error('Failed to parse JSON response:', responseText);
         if (!response.ok) {
           return {
@@ -765,7 +765,7 @@ export async function inviteTeamMember(
       let invitation;
       try {
         invitation = JSON.parse(responseText);
-      } catch (parseError) {
+      } catch {
         console.error('Failed to parse JSON response:', responseText);
         if (!response.ok) {
           return {
@@ -858,7 +858,7 @@ export async function inviteTeamMember(
  */
 export async function listTeamInvitations(teamId: string) {
   try {
-    const user = await getCurrentUser();
+    await getCurrentUser(); // Ensure user is authenticated
 
     // Verify team exists and user has access
     const teamCheck = await getTeam(teamId);
@@ -922,7 +922,7 @@ export async function listTeamInvitations(teamId: string) {
 /**
  * Fallback: Get team members directly from database
  */
-async function getTeamMembersFromDatabase(teamId: string, _currentUserId: string) {
+async function getTeamMembersFromDatabase(teamId: string) {
   try {
     const client = getClient();
 
@@ -1010,7 +1010,7 @@ export async function getTeamMembers(teamId: string) {
       if (!members || !Array.isArray(members)) {
         console.warn('listMembers returned invalid data, falling back to database query');
         // Fallback: Query member table directly
-        return await getTeamMembersFromDatabase(teamId, user.id);
+        return await getTeamMembersFromDatabase(teamId);
       }
 
       // Extract user IDs from members
@@ -1019,7 +1019,7 @@ export async function getTeamMembers(teamId: string) {
       if (userIds.length === 0) {
         console.warn('listMembers returned empty array, falling back to database query');
         // Fallback: Query member table directly
-        return await getTeamMembersFromDatabase(teamId, user.id);
+        return await getTeamMembersFromDatabase(teamId);
       }
 
       // Query users table for member details
@@ -1049,7 +1049,7 @@ export async function getTeamMembers(teamId: string) {
     } catch (error) {
       console.error('Error fetching team members from API:', error);
       // Fallback: Query member table directly
-      return await getTeamMembersFromDatabase(teamId, user.id);
+      return await getTeamMembersFromDatabase(teamId);
     }
   } catch (error) {
     console.error('Error fetching team members:', error);
@@ -1396,7 +1396,7 @@ export async function resendTeamInvitation(
       let invitation;
       try {
         invitation = JSON.parse(responseText);
-      } catch (parseError) {
+      } catch {
         console.error('Failed to parse JSON response:', responseText);
         if (!response.ok) {
           return {

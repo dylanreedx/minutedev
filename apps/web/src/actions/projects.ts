@@ -690,7 +690,7 @@ export async function inviteProjectMember(
       let invitation;
       try {
         invitation = JSON.parse(responseText);
-      } catch (parseError) {
+      } catch {
         console.error('Failed to parse JSON response:', responseText);
         if (!response.ok) {
           return {
