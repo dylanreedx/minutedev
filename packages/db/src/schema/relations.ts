@@ -4,6 +4,8 @@ import { projects } from "./projects";
 import { tickets } from "./tickets";
 import { ticketHistory, activityLog } from "./activity";
 import { comments } from "./comments";
+import { attachments } from "./attachments";
+import { ticketTemplates } from "./templates";
 
 // User relations
 export const usersRelations = relations(users, ({ many }) => ({
@@ -15,6 +17,8 @@ export const usersRelations = relations(users, ({ many }) => ({
   ticketHistory: many(ticketHistory),
   activityLogs: many(activityLog),
   comments: many(comments),
+  attachments: many(attachments),
+  ticketTemplates: many(ticketTemplates),
 }));
 
 // Session relations
@@ -32,6 +36,7 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   owner: one(users, { fields: [projects.ownerId], references: [users.id] }),
   tickets: many(tickets),
   activityLogs: many(activityLog),
+  ticketTemplates: many(ticketTemplates),
 }));
 
 // Ticket relations
@@ -53,6 +58,7 @@ export const ticketsRelations = relations(tickets, ({ one, many }) => ({
   history: many(ticketHistory),
   activityLogs: many(activityLog),
   comments: many(comments),
+  attachments: many(attachments),
 }));
 
 // Ticket history relations
@@ -99,6 +105,30 @@ export const commentsRelations = relations(comments, ({ one, many }) => ({
     relationName: "parent",
   }),
   replies: many(comments, { relationName: "parent" }),
+}));
+
+// Attachment relations
+export const attachmentsRelations = relations(attachments, ({ one }) => ({
+  ticket: one(tickets, {
+    fields: [attachments.ticketId],
+    references: [tickets.id],
+  }),
+  user: one(users, {
+    fields: [attachments.userId],
+    references: [users.id],
+  }),
+}));
+
+// Ticket template relations
+export const ticketTemplatesRelations = relations(ticketTemplates, ({ one }) => ({
+  project: one(projects, {
+    fields: [ticketTemplates.projectId],
+    references: [projects.id],
+  }),
+  creator: one(users, {
+    fields: [ticketTemplates.creatorId],
+    references: [users.id],
+  }),
 }));
 
 
