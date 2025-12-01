@@ -8,7 +8,8 @@ import { format } from "date-fns";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CreateTicketButton } from "@/components/tickets/create-ticket-button";
+import { ActionButton } from "@/components/ui/action-button";
+import { CreateTicketDialog } from "@/components/tickets/create-ticket-dialog";
 import { EditTicketSheet } from "@/components/tickets/edit-ticket-sheet";
 import { TicketFilters } from "@/components/tickets/ticket-filters";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -200,7 +201,17 @@ export function TicketsTableClient({ slug, projectId, projectName }: { slug: str
             Board View
           </Button>
         </Link>
-        <CreateTicketButton projectId={projectId} />
+        <ActionButton
+          action="create"
+          entity="ticket"
+          dialog={({ open, onOpenChange }) => (
+            <CreateTicketDialog
+              open={open}
+              onOpenChange={onOpenChange}
+              projectId={projectId}
+            />
+          )}
+        />
       </Header>
 
       <div className="px-6 py-4">
@@ -230,7 +241,19 @@ export function TicketsTableClient({ slug, projectId, projectName }: { slug: str
               icon={Ticket}
               title="No tickets yet"
               description="Create your first ticket to start tracking tasks."
-              action={<CreateTicketButton projectId={projectId} />}
+              action={
+                <ActionButton
+                  action="create"
+                  entity="ticket"
+                  dialog={({ open, onOpenChange }) => (
+                    <CreateTicketDialog
+                      open={open}
+                      onOpenChange={onOpenChange}
+                      projectId={projectId}
+                    />
+                  )}
+                />
+              }
               className="border-none min-h-[400px]"
             />
           ) : sortedTickets.length === 0 ? (

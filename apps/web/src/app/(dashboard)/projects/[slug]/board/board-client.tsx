@@ -31,10 +31,11 @@ import { CSS } from "@dnd-kit/utilities";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CreateTicketButton } from "@/components/tickets/create-ticket-button";
+import { ActionButton } from "@/components/ui/action-button";
+import { CreateTicketDialog } from "@/components/tickets/create-ticket-dialog";
 import { EditTicketSheet } from "@/components/tickets/edit-ticket-sheet";
 import { TicketFilters } from "@/components/tickets/ticket-filters";
-import { InviteProjectButton } from "@/components/projects/invite-project-button";
+import { InviteMemberDialog } from "@/components/projects/invite-member-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useTickets, useReorderTicket, ticketKeys } from "@/hooks/use-tickets";
 import { useRealtimeTickets } from "@/hooks/use-realtime";
@@ -599,8 +600,29 @@ export function BoardPageClient({
             List View
           </Button>
         </Link>
-        <InviteProjectButton projectId={projectId} />
-        <CreateTicketButton projectId={projectId} />
+        <ActionButton
+          action="invite"
+          entity="project"
+          variant="outline"
+          dialog={({ open, onOpenChange }) => (
+            <InviteMemberDialog
+              open={open}
+              onOpenChange={onOpenChange}
+              projectId={projectId}
+            />
+          )}
+        />
+        <ActionButton
+          action="create"
+          entity="ticket"
+          dialog={({ open, onOpenChange }) => (
+            <CreateTicketDialog
+              open={open}
+              onOpenChange={onOpenChange}
+              projectId={projectId}
+            />
+          )}
+        />
       </Header>
 
       <div className="px-6 py-4">
@@ -634,7 +656,19 @@ export function BoardPageClient({
             icon={Ticket}
             title="No tickets yet"
             description="Create your first ticket to start tracking tasks."
-            action={<CreateTicketButton projectId={projectId} />}
+            action={
+              <ActionButton
+                action="create"
+                entity="ticket"
+                dialog={({ open, onOpenChange }) => (
+                  <CreateTicketDialog
+                    open={open}
+                    onOpenChange={onOpenChange}
+                    projectId={projectId}
+                  />
+                )}
+              />
+            }
             className="border-none min-h-[400px]"
           />
         ) : filteredTicketsGrouped && Object.values(filteredTicketsGrouped).flat().length === 0 ? (

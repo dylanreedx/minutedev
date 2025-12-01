@@ -171,7 +171,7 @@ export function CreateTicketDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center text-left justify-between">
             <div>
               <DialogTitle>Create New Ticket</DialogTitle>
               <DialogDescription>

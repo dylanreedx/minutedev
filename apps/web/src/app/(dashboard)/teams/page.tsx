@@ -1,24 +1,23 @@
 'use client';
 
-import { useState } from 'react';
 import { Users } from 'lucide-react';
 import { Header } from '@/components/layout/header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button';
+import { ActionButton } from '@/components/ui/action-button';
 import { CreateTeamDialog, TeamList } from '@/components/teams';
 import { useTeams } from '@/hooks/use-teams';
 
 function CreateTeamButton() {
-  const [open, setOpen] = useState(false);
-
   return (
-    <>
-      <Button size="sm" onClick={() => setOpen(true)}>
-        Create Team
-      </Button>
-      <CreateTeamDialog open={open} onOpenChange={setOpen} />
-    </>
+    <ActionButton
+      action="create"
+      entity="team"
+      size="sm"
+      dialog={({ open, onOpenChange }) => (
+        <CreateTeamDialog open={open} onOpenChange={onOpenChange} />
+      )}
+    />
   );
 }
 
@@ -73,6 +72,3 @@ export default function TeamsPage() {
     </>
   );
 }
-
-
-

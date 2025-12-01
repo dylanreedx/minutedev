@@ -14,8 +14,8 @@ import {
 } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { CreateProjectButton } from './create-project-button';
-import { EditProjectSheet } from '@/components/projects';
+import { ActionButton } from '@/components/ui/action-button';
+import { CreateProjectDialog, EditProjectSheet } from '@/components/projects';
 import { useProjects } from '@/hooks/use-projects';
 import { TeamSelector } from '@/components/teams/team-selector';
 import { useTeams } from '@/hooks/use-teams';
@@ -44,7 +44,13 @@ export default function ProjectsPage() {
   return (
     <>
       <Header title="Projects">
-        <CreateProjectButton />
+        <ActionButton
+          action="create"
+          entity="project"
+          dialog={({ open, onOpenChange }) => (
+            <CreateProjectDialog open={open} onOpenChange={onOpenChange} />
+          )}
+        />
       </Header>
 
       <div className="p-6 space-y-4">
@@ -84,7 +90,15 @@ export default function ProjectsPage() {
                 ? "No projects found in this team. Create your first project to get started."
                 : "Create your first project to get started tracking your work."
             }
-            action={<CreateProjectButton />}
+            action={
+              <ActionButton
+                action="create"
+                entity="project"
+                dialog={({ open, onOpenChange }) => (
+                  <CreateProjectDialog open={open} onOpenChange={onOpenChange} />
+                )}
+              />
+            }
           />
         ) : (
           <ProjectsGrid projects={projects} onEdit={handleEdit} />
