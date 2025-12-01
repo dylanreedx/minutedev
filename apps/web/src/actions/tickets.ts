@@ -3,6 +3,8 @@
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { auth } from '@/lib/auth';
+import { triggerTicketEvent, events } from '@/lib/pusher';
+import { embedTicket } from './search';
 import {
   db,
   tickets,
@@ -10,7 +12,6 @@ import {
   users,
   eq,
   and,
-  desc,
   sql,
   max,
   type TicketStatus,
@@ -207,6 +208,15 @@ export async function createTicket(input: z.infer<typeof createTicketSchema>) {
       })
       .returning();
 
+    if (!ticket || !Array.isArray(ticket) || ticket.length === 0) {
+      return {
+        success: false,
+        error: 'Failed to create ticket',
+      };
+    }
+
+    const createdTicket = ticket[0];
+
     // Revalidate project pages
     if (accessCheck.success && accessCheck.project) {
       revalidatePath(`/projects/${accessCheck.project.slug}`);
@@ -214,7 +224,20 @@ export async function createTicket(input: z.infer<typeof createTicketSchema>) {
       revalidatePath(`/projects/${accessCheck.project.slug}/list`);
     }
 
-    return { success: true, data: ticket };
+    // Trigger real-time event
+    await triggerTicketEvent(validated.projectId, events.TICKET_CREATED, {
+      ticketId: createdTicket.id,
+      projectId: validated.projectId,
+      userId: user.id,
+      data: { title: createdTicket.title, status: createdTicket.status },
+    });
+
+    // Generate embedding in background (non-blocking)
+    embedTicket(createdTicket.id).catch((err) => 
+      console.error('Background embedding failed:', err)
+    );
+
+    return { success: true, data: createdTicket };
   } catch (error) {
     console.error('Error creating ticket:', error);
     if (error instanceof z.ZodError) {
@@ -233,7 +256,7 @@ export async function createTicket(input: z.infer<typeof createTicketSchema>) {
 
 export async function getTickets(projectId: string) {
   try {
-    const user = await getCurrentUser();
+    await getCurrentUser(); // Ensure user is authenticated
 
     // Verify project permission (read access)
     const accessCheck = await verifyProjectPermission(projectId, 'read');
@@ -306,7 +329,7 @@ export async function getTickets(projectId: string) {
 
 export async function getTicket(ticketId: string) {
   try {
-    const user = await getCurrentUser();
+    await getCurrentUser(); // Ensure user is authenticated
 
     // Get ticket with project
     const [ticket] = await db
@@ -429,6 +452,21 @@ export async function updateTicket(input: z.infer<typeof updateTicketSchema>) {
       revalidatePath(`/projects/${accessCheck.project.slug}/list`);
     }
 
+    // Trigger real-time event
+    await triggerTicketEvent(existing.projectId, events.TICKET_UPDATED, {
+      ticketId: validated.id,
+      projectId: existing.projectId,
+      userId: user.id,
+      data: { title: updated?.title, status: updated?.status },
+    });
+
+    // Re-generate embedding if title or description changed (non-blocking)
+    if (validated.title !== undefined || validated.description !== undefined) {
+      embedTicket(validated.id).catch((err) =>
+        console.error('Background embedding failed:', err)
+      );
+    }
+
     return { success: true, data: updated };
   } catch (error) {
     console.error('Error updating ticket:', error);
@@ -479,6 +517,13 @@ export async function deleteTicket(ticketId: string) {
       revalidatePath(`/projects/${accessCheck.project.slug}/board`);
       revalidatePath(`/projects/${accessCheck.project.slug}/list`);
     }
+
+    // Trigger real-time event
+    await triggerTicketEvent(existing.projectId, events.TICKET_DELETED, {
+      ticketId: ticketId,
+      projectId: existing.projectId,
+      userId: user.id,
+    });
 
     return { success: true };
   } catch (error) {
@@ -595,6 +640,18 @@ export async function reorderTicket(
       revalidatePath(`/projects/${accessCheck.project.slug}/board`);
       revalidatePath(`/projects/${accessCheck.project.slug}/list`);
     }
+
+    // Trigger real-time event
+    await triggerTicketEvent(validated.projectId, events.TICKET_MOVED, {
+      ticketId: validated.ticketId,
+      projectId: validated.projectId,
+      userId: user.id,
+      data: { 
+        newStatus: validated.newStatus, 
+        oldStatus: existing.status,
+        newOrder: Math.floor(newOrder),
+      },
+    });
 
     return { success: true, data: updated };
   } catch (error) {
