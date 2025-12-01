@@ -94,7 +94,7 @@ export default function TeamDetailPage() {
         </div>
       </Header>
 
-      <div className="p-6 space-y-6">
+      <div className="flex-1 overflow-y-auto p-6 space-y-6">
         {/* Team Info Card */}
         <Card>
           <CardHeader>
@@ -146,37 +146,46 @@ export default function TeamDetailPage() {
               </div>
             ) : members.length > 0 ? (
               <div className="space-y-2">
-                {members.map((member: any) => (
-                  <div
-                    key={member.id}
-                    className="flex items-center gap-3 py-2"
-                  >
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={member.user?.image || undefined} />
-                      <AvatarFallback>
-                        {member.user?.name
-                          ? member.user.name
-                              .split(" ")
-                              .map((n: string) => n[0])
-                              .join("")
-                              .toUpperCase()
-                              .slice(0, 2)
-                          : member.user?.email?.[0]?.toUpperCase() || "?"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {member.user?.name || "Unknown"}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {member.user?.email}
-                      </p>
+                {members.map((member) => {
+                  const memberId = typeof member.id === 'string' ? member.id : String(member.id);
+                  const user = member.user && typeof member.user === 'object' ? member.user : null;
+                  const userName = user && typeof user.name === 'string' ? user.name : null;
+                  const userEmail = user && typeof user.email === 'string' ? user.email : null;
+                  const userImage = user && typeof user.image === 'string' ? user.image : null;
+                  const role = typeof member.role === 'string' ? member.role : 'member';
+                  
+                  return (
+                    <div
+                      key={memberId}
+                      className="flex items-center gap-3 py-2"
+                    >
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={userImage || undefined} />
+                        <AvatarFallback>
+                          {userName
+                            ? userName
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")
+                                .toUpperCase()
+                                .slice(0, 2)
+                            : userEmail?.[0]?.toUpperCase() || "?"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {userName || "Unknown"}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {userEmail}
+                        </p>
+                      </div>
+                      <Badge variant="secondary" className="capitalize">
+                        {role}
+                      </Badge>
                     </div>
-                    <Badge variant="secondary" className="capitalize">
-                      {member.role || "member"}
-                    </Badge>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="rounded-lg border border-dashed p-4 text-center">
@@ -192,18 +201,27 @@ export default function TeamDetailPage() {
                 <p className="text-sm font-medium mb-2">Pending Invitations</p>
                 <div className="space-y-2">
                   {invitations
-                    .filter((inv: any) => inv.status === "pending")
-                    .map((inv: any) => (
-                      <div
-                        key={inv.id}
-                        className="flex items-center justify-between py-2 text-sm"
-                      >
-                        <span className="text-muted-foreground">{inv.email}</span>
-                        <Badge variant="outline" className="capitalize">
-                          {inv.role}
-                        </Badge>
-                      </div>
-                    ))}
+                    .filter((inv) => {
+                      const status = typeof inv.status === 'string' ? inv.status : '';
+                      return status === "pending";
+                    })
+                    .map((inv) => {
+                      const invId = typeof inv.id === 'string' ? inv.id : String(inv.id);
+                      const invEmail = typeof inv.email === 'string' ? inv.email : '';
+                      const invRole = typeof inv.role === 'string' ? inv.role : 'member';
+                      
+                      return (
+                        <div
+                          key={invId}
+                          className="flex items-center justify-between py-2 text-sm"
+                        >
+                          <span className="text-muted-foreground">{invEmail}</span>
+                          <Badge variant="outline" className="capitalize">
+                            {invRole}
+                          </Badge>
+                        </div>
+                      );
+                    })}
                 </div>
               </div>
             )}

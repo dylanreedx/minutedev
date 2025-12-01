@@ -74,8 +74,8 @@ export function TicketFilters({ className }: { className?: string }) {
   const priorityFilters = searchParams.get("priority")?.split(",") || [];
 
   return (
-    <div className={cn("flex flex-col gap-4 sm:flex-row sm:items-center", className)}>
-      <div className="relative flex-1">
+    <div className={cn("flex flex-col gap-4 sm:flex-row sm:items-start", className)}>
+      <div className="relative flex-1 sm:flex-initial">
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Filter tickets..."

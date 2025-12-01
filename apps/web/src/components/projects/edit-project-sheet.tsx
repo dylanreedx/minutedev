@@ -288,18 +288,18 @@ export function EditProjectSheet({
                 </div>
               </div>
 
-              <SheetFooter className="flex-col sm:flex-row gap-2 pt-4 pb-6 px-6 border-t bg-muted/50 flex-shrink-0">
+              <SheetFooter className="flex flex-col-reverse sm:flex-row gap-2 pt-4 pb-6 px-6 border-t bg-muted/50 flex-shrink-0">
                 <Button
                   type="button"
                   variant="destructive"
                   onClick={() => setShowDeleteConfirm(true)}
                   disabled={isFormLoading}
-                  className="sm:mr-auto w-full sm:w-auto"
+                  className="w-full sm:w-auto sm:mr-auto order-2 sm:order-1"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete
                 </Button>
-                <div className="flex gap-2 w-full sm:w-auto">
+                <div className="flex gap-2 w-full sm:w-auto order-1 sm:order-2">
                   <Button
                     type="button"
                     variant="outline"
