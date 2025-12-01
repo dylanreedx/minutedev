@@ -24,7 +24,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import {
   Select,
   SelectContent,
@@ -42,6 +42,7 @@ import { cn } from "@/lib/utils";
 import { useTicket, useUpdateTicket, useDeleteTicket } from "@/hooks/use-tickets";
 import { useProjectMembers } from "@/hooks/use-projects";
 import { CommentsSection } from "@/components/tickets/comments-section";
+import { AttachmentsSection } from "@/components/tickets/attachments-section";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { TicketStatus, TicketPriority } from "@minute/db";
 
@@ -209,19 +210,14 @@ export function EditTicketSheet({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="edit-description">Description (optional)</Label>
-                  <Textarea
-                    id="edit-description"
+                  <Label>Description (optional)</Label>
+                  <RichTextEditor
+                    content={description}
+                    onChange={setDescription}
                     placeholder="Describe the ticket..."
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
                     disabled={isFormLoading}
-                    maxLength={5000}
-                    rows={4}
+                    minHeight="100px"
                   />
-                  <p className="text-muted-foreground text-xs">
-                    {description.length}/5000 characters
-                  </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -350,24 +346,29 @@ export function EditTicketSheet({
                 </div>
 
                 {ticketId && (
-                  <div className="pt-4 border-t">
-                    <CommentsSection ticketId={ticketId} />
-                  </div>
+                  <>
+                    <div className="pt-4 border-t">
+                      <AttachmentsSection ticketId={ticketId} />
+                    </div>
+                    <div className="pt-4 border-t">
+                      <CommentsSection ticketId={ticketId} />
+                    </div>
+                  </>
                 )}
                 </div>
 
-                <SheetFooter className="flex-col sm:flex-row gap-2 pt-4 pb-6 px-6 border-t bg-muted/50 flex-shrink-0">
+                <SheetFooter className="flex flex-col-reverse sm:flex-row gap-2 pt-4 pb-6 px-6 border-t bg-muted/50 flex-shrink-0">
                   <Button
                     type="button"
                     variant="destructive"
                     onClick={() => setShowDeleteConfirm(true)}
                     disabled={isFormLoading}
-                    className="sm:mr-auto w-full sm:w-auto"
+                    className="w-full sm:w-auto sm:mr-auto order-2 sm:order-1"
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
                     Delete
                   </Button>
-                  <div className="flex gap-2 w-full sm:w-auto">
+                  <div className="flex gap-2 w-full sm:w-auto order-1 sm:order-2">
                     <Button
                       type="button"
                       variant="outline"
