@@ -1,19 +1,19 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
   semanticSearchTickets,
   findSimilarTickets,
   embedTicket,
   embedProjectTickets,
-} from "@/actions/search";
+} from '@/actions/search';
 
 // Query keys
 export const searchKeys = {
-  all: ["search"] as const,
+  all: ['search'] as const,
   semantic: (projectId: string, query: string) =>
-    [...searchKeys.all, "semantic", projectId, query] as const,
+    [...searchKeys.all, 'semantic', projectId, query] as const,
   similar: (ticketId: string) =>
-    [...searchKeys.all, "similar", ticketId] as const,
+    [...searchKeys.all, 'similar', ticketId] as const,
 };
 
 // Hook for semantic search
@@ -25,7 +25,7 @@ export function useSemanticSearch(
   const { enabled = true, limit, threshold } = options;
 
   return useQuery({
-    queryKey: searchKeys.semantic(projectId || "", query),
+    queryKey: searchKeys.semantic(projectId || '', query),
     queryFn: () =>
       semanticSearchTickets(projectId!, query, { limit, threshold }),
     enabled: enabled && !!projectId && query.length > 2,
@@ -41,7 +41,7 @@ export function useSimilarTickets(
   const { enabled = true, limit, threshold } = options;
 
   return useQuery({
-    queryKey: searchKeys.similar(ticketId || ""),
+    queryKey: searchKeys.similar(ticketId || ''),
     queryFn: () => findSimilarTickets(ticketId!, { limit, threshold }),
     enabled: enabled && !!ticketId,
     staleTime: 1000 * 60 * 5, // 5 minutes
@@ -61,14 +61,16 @@ export function useEmbedTicket() {
           queryKey: searchKeys.similar(ticketId),
         });
         if (!('cached' in result && result.cached)) {
-          toast.success("Ticket embedded for semantic search");
+          toast.success('Ticket embedded for semantic search');
         }
+      } else if ('error' in result) {
+        toast.error(result.error || 'Failed to embed ticket');
       } else {
-        toast.error(result.error || "Failed to embed ticket");
+        toast.error('Failed to embed ticket');
       }
     },
     onError: (error: Error) => {
-      toast.error(error.message || "Failed to embed ticket");
+      toast.error(error.message || 'Failed to embed ticket');
     },
   });
 }
@@ -89,12 +91,11 @@ export function useEmbedProjectTickets() {
           `Embedded ${result.data.embedded} tickets (${result.data.cached} cached, ${result.data.errors} errors)`
         );
       } else if (!result.success && 'error' in result) {
-        toast.error(result.error || "Failed to embed tickets");
+        toast.error(result.error || 'Failed to embed tickets');
       }
     },
     onError: (error: Error) => {
-      toast.error(error.message || "Failed to embed tickets");
+      toast.error(error.message || 'Failed to embed tickets');
     },
   });
 }
-

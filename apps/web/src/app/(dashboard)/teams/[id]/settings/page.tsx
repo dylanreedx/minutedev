@@ -17,7 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
+// Separator is imported but not used - keeping for potential future use
 import {
   AlertDialog,
   AlertDialogAction,
@@ -205,7 +205,12 @@ export default function TeamSettingsPage() {
   const isFormLoading = teamLoading || isLoading;
 
   // Get current user's role in the team
-  const currentUserMember = members.find((m: any) => m.userId === currentUserId);
+  type TeamMember = {
+    userId: string;
+    role: string;
+    user?: { id: string; name: string | null; email: string | null; image: string | null } | null;
+  };
+  const currentUserMember = members.find((m: TeamMember) => m.userId === currentUserId);
   const currentUserRole: TeamRole | null = (currentUserMember?.role as TeamRole) || null;
 
   // Permission checks
@@ -244,7 +249,7 @@ export default function TeamSettingsPage() {
           <EmptyState
             icon={Users}
             title="Team not found"
-            description="The team you're looking for doesn't exist or you don't have access to it."
+            description="The team you&apos;re looking for doesn&apos;t exist or you don&apos;t have access to it."
             action={
               <Button variant="outline" asChild>
                 <Link href="/teams">
@@ -363,7 +368,7 @@ export default function TeamSettingsPage() {
               </div>
             ) : members.length > 0 ? (
               <div className="space-y-2">
-                {members.map((member: any) => {
+                {members.map((member: TeamMember & { id: string }) => {
                   const isCurrentUser = member.userId === currentUserId;
                   const isUpdating = updatingMemberId === member.id;
                   const currentRole = member.role || 'member';
@@ -478,8 +483,8 @@ export default function TeamSettingsPage() {
                 <h3 className="text-sm font-medium mb-3">Pending Invitations</h3>
                 <div className="space-y-2">
                   {invitations
-                    .filter((inv: any) => inv.status === 'pending')
-                    .map((inv: any) => (
+                    .filter((inv: { status: string }) => inv.status === 'pending')
+                    .map((inv: { id: string; email: string; role: string; status: string; expiresAt?: string | null }) => (
                       <div
                         key={inv.id}
                         className="flex items-center justify-between py-2 px-3 rounded-lg border"
@@ -658,10 +663,10 @@ export default function TeamSettingsPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Change Member Role?</AlertDialogTitle>
               <AlertDialogDescription>
-                You are about to change this member's role from <strong>{showRoleChangeConfirm.oldRole}</strong> to <strong>{showRoleChangeConfirm.newRole}</strong>.
+                You are about to change this member&apos;s role from <strong>{showRoleChangeConfirm.oldRole}</strong> to <strong>{showRoleChangeConfirm.newRole}</strong>.
                 {showRoleChangeConfirm.oldRole === 'owner' && showRoleChangeConfirm.newRole !== 'owner' && (
                   <span className="block mt-2 text-destructive">
-                    Warning: Removing owner status will reduce this member's permissions significantly.
+                    Warning: Removing owner status will reduce this member&apos;s permissions significantly.
                   </span>
                 )}
               </AlertDialogDescription>

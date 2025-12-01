@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { Search, X, Filter, CircleDashed, Signal } from "lucide-react";
+import { Search, X, CircleDashed, Signal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,17 +26,8 @@ export function TicketFilters({ className }: { className?: string }) {
     searchParams.get("search") || ""
   );
 
-  // Debounce search update
-  React.useEffect(() => {
-    const timer = setTimeout(() => {
-      updateFilter("search", searchValue);
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [searchValue]);
-
   // Update URL params
-  const updateFilter = (key: string, value: string | null) => {
+  const updateFilter = React.useCallback((key: string, value: string | null) => {
     const params = new URLSearchParams(searchParams.toString());
     if (value) {
       params.set(key, value);
@@ -44,7 +35,16 @@ export function TicketFilters({ className }: { className?: string }) {
       params.delete(key);
     }
     router.replace(`${pathname}?${params.toString()}`);
-  };
+  }, [searchParams, pathname, router]);
+
+  // Debounce search update
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      updateFilter("search", searchValue);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchValue, updateFilter]);
 
   // Helper to toggle multi-select values
   const toggleValue = (key: string, value: string) => {

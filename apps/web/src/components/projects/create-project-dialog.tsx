@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { Loader2 } from "lucide-react";
+import { useState, useEffect } from 'react';
+import { Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -9,14 +9,14 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { useCreateProject } from "@/hooks/use-projects";
-import { TeamSelector } from "@/components/teams/team-selector";
-import { useTeams } from "@/hooks/use-teams";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { useCreateProject } from '@/hooks/use-projects';
+import { TeamSelector } from '@/components/teams/team-selector';
+import { useTeams } from '@/hooks/use-teams';
 
 interface CreateProjectDialogProps {
   open: boolean;
@@ -29,9 +29,9 @@ function generateSlug(name: string): string {
   return name
     .toLowerCase()
     .trim()
-    .replace(/[^\w\s-]/g, "") // Remove special characters
-    .replace(/[\s_-]+/g, "-") // Replace spaces and underscores with hyphens
-    .replace(/^-+|-+$/g, ""); // Remove leading/trailing hyphens
+    .replace(/[^\w\s-]/g, '') // Remove special characters
+    .replace(/[\s_-]+/g, '-') // Replace spaces and underscores with hyphens
+    .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
 }
 
 export function CreateProjectDialog({
@@ -39,9 +39,9 @@ export function CreateProjectDialog({
   onOpenChange,
   defaultTeamId,
 }: CreateProjectDialogProps) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [teamId, setTeamId] = useState<string>(defaultTeamId || "");
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [teamId, setTeamId] = useState<string>(defaultTeamId || '');
   const createProject = useCreateProject();
   const { data: teams = [] } = useTeams();
 
@@ -50,19 +50,20 @@ export function CreateProjectDialog({
     if (defaultTeamId) {
       setTeamId(defaultTeamId);
     } else if (teams.length === 1 && !teamId) {
-      const firstTeam = teams[0] as any;
+      const firstTeam = teams[0];
       if (firstTeam?.id) {
         setTeamId(firstTeam.id);
       }
     }
-  }, [teams, teamId, defaultTeamId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teams.length, defaultTeamId]); // Only depend on length and defaultTeamId to avoid unnecessary re-runs
 
-  const slugPreview = name ? generateSlug(name) : "";
+  const slugPreview = name ? generateSlug(name) : '';
   const isLoading = createProject.isPending;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!name.trim() || !teamId) {
       return;
     }
@@ -75,13 +76,13 @@ export function CreateProjectDialog({
       });
 
       // Reset form and close dialog on success
-      setName("");
-      setDescription("");
-      setTeamId("");
+      setName('');
+      setDescription('');
+      setTeamId('');
       onOpenChange(false);
     } catch (error) {
       // Error handling is done in the mutation hook
-      console.error("Error creating project:", error);
+      console.error('Error creating project:', error);
     }
   };
 
@@ -90,9 +91,9 @@ export function CreateProjectDialog({
       onOpenChange(newOpen);
       // Reset form when closing
       if (!newOpen) {
-        setName("");
-        setDescription("");
-        setTeamId(defaultTeamId || "");
+        setName('');
+        setDescription('');
+        setTeamId(defaultTeamId || '');
       }
     }
   };
@@ -119,7 +120,8 @@ export function CreateProjectDialog({
               placeholder="Select a team..."
             />
             <p className="text-xs text-muted-foreground">
-              Projects must belong to a team. Create a team if you don't have one.
+              Projects must belong to a team. Create a team if you don&apos;t
+              have one.
             </p>
           </div>
 
@@ -175,14 +177,17 @@ export function CreateProjectDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading || !name.trim() || !teamId}>
+            <Button
+              type="submit"
+              disabled={isLoading || !name.trim() || !teamId}
+            >
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Creating...
                 </>
               ) : (
-                "Create Project"
+                'Create Project'
               )}
             </Button>
           </DialogFooter>
@@ -191,4 +196,3 @@ export function CreateProjectDialog({
     </Dialog>
   );
 }
-
