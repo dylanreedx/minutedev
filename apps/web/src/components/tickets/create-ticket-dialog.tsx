@@ -67,6 +67,8 @@ export function CreateTicketDialog({
   const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
   const [points, setPoints] = useState<string>('');
   const [assigneeId, setAssigneeId] = useState<string>('unassigned');
+  const [selectedTemplate, setSelectedTemplate] =
+    useState<TicketTemplate | null>(null);
 
   const createTicket = useCreateTicket();
   const { data: members = [], isLoading: isLoadingMembers } = useProjectMembers(
@@ -105,6 +107,7 @@ export function CreateTicketDialog({
       setDueDate(undefined);
       setPoints('');
       setAssigneeId('unassigned');
+      setSelectedTemplate(null);
       onOpenChange(false);
     } catch (error) {
       // Error handling is done in the mutation hook
@@ -124,6 +127,7 @@ export function CreateTicketDialog({
         setDueDate(undefined);
         setPoints('');
         setAssigneeId('unassigned');
+        setSelectedTemplate(null);
       }
     }
   };
@@ -145,6 +149,7 @@ export function CreateTicketDialog({
   };
 
   const handleSelectTemplate = (template: TicketTemplate) => {
+    setSelectedTemplate(template);
     // Apply template values
     if (template.titleTemplate) {
       setTitle(template.titleTemplate);
@@ -161,6 +166,12 @@ export function CreateTicketDialog({
     if (template.defaultPoints) {
       setPoints(template.defaultPoints.toString());
     }
+  };
+
+  const handleClearTemplate = () => {
+    setSelectedTemplate(null);
+    // Optionally clear form fields when clearing template
+    // For now, we'll keep the values but just clear the template selection
   };
 
   const setDefaultPriority = (priority: TicketPriority) => {
@@ -181,6 +192,8 @@ export function CreateTicketDialog({
             <TemplateSelector
               projectId={projectId}
               onSelectTemplate={handleSelectTemplate}
+              selectedTemplate={selectedTemplate}
+              onClearTemplate={handleClearTemplate}
             />
           </div>
         </DialogHeader>
