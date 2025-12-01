@@ -14,7 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import {
   Select,
   SelectContent,
@@ -32,7 +32,8 @@ import { cn } from '@/lib/utils';
 import { useCreateTicket } from '@/hooks/use-tickets';
 import { useProjectMembers } from '@/hooks/use-projects';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import type { TicketStatus, TicketPriority } from '@minute/db';
+import { TemplateSelector } from './template-selector';
+import type { TicketStatus, TicketPriority, TicketTemplate } from '@minute/db';
 
 interface CreateTicketDialogProps {
   open: boolean;
@@ -143,14 +144,45 @@ export function CreateTicketDialog({
     return user.email?.[0]?.toUpperCase() || '?';
   };
 
+  const handleSelectTemplate = (template: TicketTemplate) => {
+    // Apply template values
+    if (template.titleTemplate) {
+      setTitle(template.titleTemplate);
+    }
+    if (template.descriptionTemplate) {
+      setDescription(template.descriptionTemplate);
+    }
+    if (template.defaultStatus) {
+      setStatus(template.defaultStatus);
+    }
+    if (template.defaultPriority) {
+      setDefaultPriority(template.defaultPriority);
+    }
+    if (template.defaultPoints) {
+      setPoints(template.defaultPoints.toString());
+    }
+  };
+
+  const setDefaultPriority = (priority: TicketPriority) => {
+    setPriority(priority);
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Create New Ticket</DialogTitle>
-          <DialogDescription>
-            Add a new ticket to track work and tasks.
-          </DialogDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <DialogTitle>Create New Ticket</DialogTitle>
+              <DialogDescription>
+                Add a new ticket to track work and tasks.
+              </DialogDescription>
+            </div>
+            <TemplateSelector
+              projectId={projectId}
+              onSelectTemplate={handleSelectTemplate}
+            />
+          </div>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -171,19 +203,14 @@ export function CreateTicketDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">Description (optional)</Label>
-            <Textarea
-              id="description"
+            <Label>Description (optional)</Label>
+            <RichTextEditor
+              content={description}
+              onChange={setDescription}
               placeholder="Describe the ticket..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
               disabled={isLoading}
-              maxLength={5000}
-              rows={4}
+              minHeight="100px"
             />
-            <p className="text-muted-foreground text-xs">
-              {description.length}/5000 characters
-            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
