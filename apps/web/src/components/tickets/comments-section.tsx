@@ -17,6 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useComments, useCreateComment, useUpdateComment, useDeleteComment } from "@/hooks/use-comments";
+import { useRealtimeComments } from "@/hooks/use-realtime";
 import { useSession } from "@/lib/auth-client";
 import { Separator } from "@/components/ui/separator";
 
@@ -46,6 +47,9 @@ export function CommentsSection({ ticketId }: CommentsSectionProps) {
   const createComment = useCreateComment();
   const updateComment = useUpdateComment();
   const deleteComment = useDeleteComment();
+  
+  // Subscribe to real-time comment updates
+  useRealtimeComments(ticketId);
 
   const [newComment, setNewComment] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);

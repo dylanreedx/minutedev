@@ -37,6 +37,7 @@ import { TicketFilters } from "@/components/tickets/ticket-filters";
 import { InviteProjectButton } from "@/components/projects/invite-project-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useTickets, useReorderTicket, ticketKeys } from "@/hooks/use-tickets";
+import { useRealtimeTickets } from "@/hooks/use-realtime";
 import { useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -276,6 +277,9 @@ export function BoardPageClient({
   const queryClient = useQueryClient();
   const { data: ticketsGrouped, isLoading, error } = useTickets(projectId);
   const reorderMutation = useReorderTicket();
+  
+  // Subscribe to real-time ticket updates
+  useRealtimeTickets(projectId); // Enable real-time updates
 
   const filteredTicketsGrouped = useMemo(() => {
     if (!ticketsGrouped) return null;
@@ -341,7 +345,7 @@ export function BoardPageClient({
 
   // Handle drag over - track which column/ticket is being dragged over and position
   const handleDragOver = useCallback((event: DragOverEvent) => {
-    const { over, active, collisions } = event;
+    const { over, active } = event;
     
     if (!over || !active) {
       setOverId(null);
@@ -693,7 +697,7 @@ export function BoardPageClient({
                             </div>
                           )
                         ) : (
-                          tickets.map((ticket, index) => {
+                          tickets.map((ticket) => {
                             // Simplified check: are we dragging and hovering over this ticket?
                             const isDragging = activeId && activeId !== ticket.id;
                             const isHoveringThis = overId === ticket.id;

@@ -3,6 +3,7 @@
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { auth } from '@/lib/auth';
+import { triggerCommentEvent, events } from '@/lib/pusher';
 import {
   db,
   comments,
@@ -159,6 +160,13 @@ export async function createComment(
     }
     
     const comment = commentResult[0];
+    
+    if (!comment) {
+      return {
+        success: false,
+        error: 'Failed to create comment',
+      };
+    }
 
     // Revalidate ticket pages
     if (accessCheck.success && accessCheck.project) {
@@ -166,6 +174,13 @@ export async function createComment(
       revalidatePath(`/projects/${accessCheck.project.slug}/board`);
       revalidatePath(`/projects/${accessCheck.project.slug}/list`);
     }
+
+    // Trigger real-time event
+    await triggerCommentEvent(validated.ticketId, events.COMMENT_CREATED, {
+      commentId: comment.id,
+      ticketId: validated.ticketId,
+      userId: user.id,
+    });
 
     return { success: true, data: comment };
   } catch (error) {
@@ -322,6 +337,13 @@ export async function updateComment(
       revalidatePath(`/projects/${accessCheck.project.slug}/list`);
     }
 
+    // Trigger real-time event
+    await triggerCommentEvent(existing.ticketId, events.COMMENT_UPDATED, {
+      commentId: validated.id,
+      ticketId: existing.ticketId,
+      userId: user.id,
+    });
+
     return { success: true, data: updated };
   } catch (error) {
     console.error('Error updating comment:', error);
@@ -395,6 +417,13 @@ export async function deleteComment(commentId: string) {
       revalidatePath(`/projects/${accessCheck.project.slug}/board`);
       revalidatePath(`/projects/${accessCheck.project.slug}/list`);
     }
+
+    // Trigger real-time event
+    await triggerCommentEvent(existing.ticketId, events.COMMENT_DELETED, {
+      commentId: commentId,
+      ticketId: existing.ticketId,
+      userId: user.id,
+    });
 
     return { success: true };
   } catch (error) {
