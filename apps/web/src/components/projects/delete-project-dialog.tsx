@@ -52,7 +52,7 @@ export function DeleteProjectDialog({
           </AlertDialogTitle>
           <AlertDialogDescription className="space-y-2">
             <p>
-              Are you sure you want to delete <strong>"{projectName}"</strong>?
+              Are you sure you want to delete <strong>&quot;{projectName}&quot;</strong>?
             </p>
             {ticketCount > 0 && (
               <div className="mt-3 rounded-md bg-destructive/10 border border-destructive/20 p-3">

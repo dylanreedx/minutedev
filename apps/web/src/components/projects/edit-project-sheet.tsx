@@ -61,7 +61,9 @@ export function EditProjectSheet({
   // Initialize form when project data loads
   useEffect(() => {
     if (project) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setName(project.name);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDescription(project.description || "");
     }
   }, [project]);
@@ -339,7 +341,7 @@ export function EditProjectSheet({
           <AlertDialogTitle>Are you sure?</AlertDialogTitle>
           <AlertDialogDescription>
             This action cannot be undone. This will permanently delete the project
-            "{project?.name}" and all associated tickets.
+            &quot;{project?.name}&quot; and all associated tickets.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

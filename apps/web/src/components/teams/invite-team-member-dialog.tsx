@@ -143,7 +143,7 @@ export function InviteTeamMemberDialog({
                 </Button>
               </div>
               <p className="text-sm text-muted-foreground">
-                Copy this link and share it with the person you want to invite. They'll be able to create an account and join your team.
+                Copy this link and share it with the person you want to invite. They&apos;ll be able to create an account and join your team.
               </p>
             </div>
             <DialogFooter>

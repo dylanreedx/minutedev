@@ -17,7 +17,18 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { CreateTeamDialog } from "./create-team-dialog";
 import { useState } from "react";
 
-function TeamCard({ team }: { team: any }) {
+type Team = {
+  id: string;
+  name: string;
+  slug: string;
+  logo?: string | null;
+  metadata?: unknown;
+  createdAt: Date | string;
+  projectCount?: number;
+  memberCount?: number;
+};
+
+function TeamCard({ team }: { team: Team }) {
   const router = useRouter();
   // Use optimized counts from getTeams query instead of separate queries
   const projectCount = team.projectCount ?? 0;
@@ -121,8 +132,8 @@ export function TeamList() {
   return (
     <>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {teams.map((team: any) => (
-          <TeamCard key={team.id} team={team} />
+        {teams.map((team) => (
+          <TeamCard key={team.id} team={team as Team} />
         ))}
       </div>
       <CreateTeamDialog

@@ -247,7 +247,7 @@ export function AttachmentsSection({ ticketId }: AttachmentsSectionProps) {
         </div>
       ) : (
         <div className="text-center py-6 text-sm text-muted-foreground">
-          No attachments yet. Click "Add File" to upload.
+          No attachments yet. Click &quot;Add File&quot; to upload.
         </div>
       )}
 

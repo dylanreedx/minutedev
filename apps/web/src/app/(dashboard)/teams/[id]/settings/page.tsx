@@ -206,12 +206,17 @@ export default function TeamSettingsPage() {
 
   // Get current user's role in the team
   type TeamMember = {
+    id: string;
     userId: string;
-    role: string;
+    role: 'owner' | 'admin' | 'member';
+    organizationId: string;
     user?: { id: string; name: string | null; email: string | null; image: string | null } | null;
   };
-  const currentUserMember = members.find((m: TeamMember) => m.userId === currentUserId);
-  const currentUserRole: TeamRole | null = (currentUserMember?.role as TeamRole) || null;
+  const currentUserMember = members.find((m) => {
+    const member = m as TeamMember;
+    return member.userId === currentUserId;
+  }) as TeamMember | undefined;
+  const currentUserRole: TeamRole | null = currentUserMember?.role ? (currentUserMember.role as TeamRole) : null;
 
   // Permission checks
   const canUpdateSettings = currentUserRole ? canUpdateTeamSettings(currentUserRole) : false;
@@ -283,7 +288,7 @@ export default function TeamSettingsPage() {
           <CardHeader>
             <CardTitle>Team Information</CardTitle>
             <CardDescription>
-              Update your team's name and slug.
+              Update your team&apos;s name and slug.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -368,33 +373,34 @@ export default function TeamSettingsPage() {
               </div>
             ) : members.length > 0 ? (
               <div className="space-y-2">
-                {members.map((member: TeamMember & { id: string }) => {
-                  const isCurrentUser = member.userId === currentUserId;
-                  const isUpdating = updatingMemberId === member.id;
-                  const currentRole = member.role || 'member';
+                {members.map((member) => {
+                  const typedMember = member as TeamMember;
+                  const isCurrentUser = typedMember.userId === currentUserId;
+                  const isUpdating = updatingMemberId === typedMember.id;
+                  const currentRole = (typedMember.role || 'member') as 'owner' | 'admin' | 'member';
                   
                   return (
                     <div
-                      key={member.id}
+                      key={typedMember.id}
                       className="flex items-center gap-3 py-2 px-3 rounded-lg border"
                     >
                       <Avatar className="h-8 w-8">
-                        <AvatarImage src={member.user?.image || undefined} />
+                        <AvatarImage src={typedMember.user?.image || undefined} />
                         <AvatarFallback>
-                          {member.user?.name
-                            ? member.user.name
+                          {typedMember.user?.name
+                            ? typedMember.user.name
                                 .split(' ')
                                 .map((n: string) => n[0])
                                 .join('')
                                 .toUpperCase()
                                 .slice(0, 2)
-                            : member.user?.email?.[0]?.toUpperCase() || '?'}
+                            : typedMember.user?.email?.[0]?.toUpperCase() || '?'}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-medium truncate">
-                            {member.user?.name || 'Unknown'}
+                            {typedMember.user?.name || 'Unknown'}
                           </p>
                           {isCurrentUser && (
                             <Badge variant="secondary" className="text-xs">
@@ -403,16 +409,17 @@ export default function TeamSettingsPage() {
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground truncate">
-                          {member.user?.email}
+                          {typedMember.user?.email}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="flex items-center gap-1">
                           <Select
                             value={currentRole}
-                            onValueChange={(value: 'owner' | 'admin' | 'member') =>
-                              handleUpdateMemberRole(member.id, value, currentRole)
-                            }
+                            onValueChange={(value) => {
+                              const role = value as 'owner' | 'admin' | 'member';
+                              handleUpdateMemberRole(typedMember.id, role, currentRole);
+                            }}
                             disabled={updateMemberRole.isPending || isUpdating || !canManageMembers}
                           >
                             <SelectTrigger className="w-32">
@@ -451,7 +458,7 @@ export default function TeamSettingsPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => setShowRemoveMemberConfirm(member.id)}
+                          onClick={() => setShowRemoveMemberConfirm(typedMember.id)}
                           disabled={removeMember.isPending || isCurrentUser || !canRemoveTeamMembers}
                           className="h-8 w-8 text-destructive hover:text-destructive"
                           title={
@@ -483,28 +490,39 @@ export default function TeamSettingsPage() {
                 <h3 className="text-sm font-medium mb-3">Pending Invitations</h3>
                 <div className="space-y-2">
                   {invitations
-                    .filter((inv: { status: string }) => inv.status === 'pending')
-                    .map((inv: { id: string; email: string; role: string; status: string; expiresAt?: string | null }) => (
+                    .filter((inv) => {
+                      const typedInv = inv as { status: string };
+                      return typedInv.status === 'pending';
+                    })
+                    .map((inv) => {
+                      const typedInv = inv as { 
+                        id: string; 
+                        email: string; 
+                        role: 'owner' | 'admin' | 'member'; 
+                        status: string; 
+                        expiresAt?: Date | string | null;
+                      };
+                      return (
                       <div
-                        key={inv.id}
+                        key={typedInv.id}
                         className="flex items-center justify-between py-2 px-3 rounded-lg border"
                       >
                         <div className="flex items-center gap-3">
                           <div>
-                            <p className="text-sm font-medium">{inv.email}</p>
+                            <p className="text-sm font-medium">{typedInv.email}</p>
                             <p className="text-xs text-muted-foreground">
-                              Invited as {inv.role}
+                              Invited as {typedInv.role}
                             </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className="capitalize">
-                            {inv.role}
+                            {typedInv.role}
                           </Badge>
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => setShowCancelInviteConfirm(inv.id)}
+                            onClick={() => setShowCancelInviteConfirm(typedInv.id)}
                             disabled={cancelInvitation.isPending}
                             className="h-8 w-8 text-destructive hover:text-destructive"
                           >
@@ -512,7 +530,8 @@ export default function TeamSettingsPage() {
                           </Button>
                         </div>
                       </div>
-                    ))}
+                    );
+                    })}
                 </div>
               </div>
             )}

@@ -16,6 +16,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useQueryClient } from "@tanstack/react-query";
 import { teamKeys } from "@/hooks/use-teams";
 
+type Team = {
+  id: string;
+  name: string;
+  slug: string;
+  logo?: string | null;
+  metadata?: unknown;
+  createdAt: Date | string;
+  projectCount?: number;
+  memberCount?: number;
+};
+
 interface TeamSelectorProps {
   value?: string;
   onValueChange: (teamId: string) => void;
@@ -37,14 +48,14 @@ export function TeamSelector({
   useEffect(() => {
     if (!createDialogOpen && teams.length > 0 && !value) {
       // If no team is selected but teams exist, select the first one
-      const firstTeam = teams[0] as any;
+      const firstTeam = teams[0] as Team;
       if (firstTeam?.id) {
         onValueChange(firstTeam.id);
       }
     }
   }, [createDialogOpen, teams, value, onValueChange]);
 
-  const selectedTeam = value && value !== 'all' ? teams.find((team: any) => team.id === value) : null;
+  const selectedTeam = value && value !== 'all' ? teams.find((team) => (team as Team).id === value) as Team | undefined : null;
 
   if (isLoading) {
     return <Skeleton className="h-10 w-full" />;
@@ -83,11 +94,14 @@ export function TeamSelector({
                 {placeholder === "All teams" && (
                   <SelectItem value="all">All teams</SelectItem>
                 )}
-                {teams.map((team: any) => (
-                  <SelectItem key={team.id} value={team.id}>
-                    {team.name}
-                  </SelectItem>
-                ))}
+                {teams.map((team) => {
+                  const typedTeam = team as Team;
+                  return (
+                    <SelectItem key={typedTeam.id} value={typedTeam.id}>
+                      {typedTeam.name}
+                    </SelectItem>
+                  );
+                })}
                 <div className="border-t p-1">
                   <Button
                     variant="ghost"

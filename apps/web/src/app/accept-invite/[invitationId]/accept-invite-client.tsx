@@ -171,7 +171,7 @@ export function AcceptInviteClient({
             </div>
             <CardTitle>Invitation Accepted!</CardTitle>
             <CardDescription>
-              You've successfully joined {organizationName}. Redirecting...
+              You&apos;ve successfully joined {organizationName}. Redirecting...
             </CardDescription>
           </CardHeader>
         </Card>
@@ -189,7 +189,7 @@ export function AcceptInviteClient({
             </div>
             <CardTitle>Invitation Declined</CardTitle>
             <CardDescription>
-              You've declined the invitation. Redirecting...
+              You&apos;ve declined the invitation. Redirecting...
             </CardDescription>
           </CardHeader>
         </Card>
@@ -283,7 +283,7 @@ export function AcceptInviteClient({
         <CardHeader>
             <CardTitle>Team Invitation</CardTitle>
             <CardDescription>
-              You've been invited to join {organizationName}.
+              You&apos;ve been invited to join {organizationName}.
             </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
