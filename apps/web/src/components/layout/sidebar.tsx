@@ -85,7 +85,7 @@ export function Sidebar({ user }: SidebarProps) {
   };
 
   return (
-    <aside className="hidden w-64 flex-col border-r border-border bg-sidebar md:flex">
+    <aside className="flex w-64 flex-col border-r border-border bg-sidebar">
       {/* Logo */}
       <div className="flex h-14 items-center gap-2 border-b border-border px-4">
         <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
